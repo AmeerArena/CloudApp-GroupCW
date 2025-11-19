@@ -55,8 +55,9 @@ def student_enroll(req: func.HttpRequest) -> func.HttpResponse:
     if not student_name:
         return func.HttpResponse(json.dumps({"result": False, "msg": "student must have a name"}))
     
-    if not student_modules:
-        return func.HttpResponse(json.dumps({"result": False, "msg": "student must take at least 1 module"}))
+    if len(student_modules) < 1 or len(student_modules) > 4:
+        return func.HttpResponse(json.dumps({"result": False, "msg": "Student must take anywhere between 1 and 4 modules. "}))
+    
 
     StudentContainer = get_student_container()
     
@@ -72,8 +73,8 @@ def student_enroll(req: func.HttpRequest) -> func.HttpResponse:
 
     newStudent = {
         "id": str(uuid.uuid4()),
-        "username": student_name,
-        "password": student_modules,
+        "name": student_name,
+        "modules": student_modules,
         "attended_lectures": []
     }
 
@@ -217,3 +218,67 @@ def lecture_make(req: func.HttpRequest) -> func.HttpResponse:
     return func.HttpResponse(
         json.dumps({"result": True, "msg": "OK"})
     )
+
+@app.route(route="student/changesmodules", auth_level=func.AuthLevel.FUNCTION, methods=["PUT"])
+def student_changesmodules(req: func.HttpRequest) -> func.HttpResponse:
+    logging.info('Student change modules function running.')
+
+    studentjson = req.get_json()
+    student_name = studentjson.get("name")
+    new_modules = studentjson.get("new_modules")
+
+    if not student_name:
+        return func.HttpResponse(json.dumps({"result": False, "msg": "Student must have a name"}))
+    
+    if not new_modules:
+        return func.HttpResponse(json.dumps({"result": False, "msg": "No new module choice"}))
+    
+    studentContainer = get_student_container()
+
+    students = list(
+        studentContainer.query_items(
+            query="SELECT * FROM s WHERE s.name = @name",
+            parameters=[{"name": "@name", "value": student_name}],
+            enable_cross_partition_query = True
+        )
+    )
+    student = students[0]
+
+    if not student:
+        return func.HttpResponse(json.dumps({"result": False, "msg": "Student doesn't exist"}))
+    
+    if len(new_modules) < 1 or len(new_modules) > 4:
+        return func.HttpResponse(json.dumps({"result": False, "msg": "New module selection must be anywehere between 1 to 4 modules"}))
+    
+    student["modules"] = new_modules
+    studentContainer.replace_item(item = student["id"], body = student)
+    
+    return func.HttpResponse(json.dumps({"result": True, "msg": True}))
+
+
+
+
+
+
+
+
+@app.route(route="student_attendlectures", auth_level=func.AuthLevel.FUNCTION)
+def student_attendlectures(req: func.HttpRequest) -> func.HttpResponse:
+    logging.info('Python HTTP trigger function processed a request.')
+
+    name = req.params.get('name')
+    if not name:
+        try:
+            req_body = req.get_json()
+        except ValueError:
+            pass
+        else:
+            name = req_body.get('name')
+
+    if name:
+        return func.HttpResponse(f"Hello, {name}. This HTTP triggered function executed successfully.")
+    else:
+        return func.HttpResponse(
+             "This HTTP triggered function executed successfully. Pass a name in the query string or in the request body for a personalized response.",
+             status_code=200
+        )
