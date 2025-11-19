@@ -8,6 +8,7 @@ from azure.cosmos import CosmosClient
 
 app = func.FunctionApp()
 
+# Get db
 def get_cosmos_db():
     cosmos_conn = os.environ.get("AzureCosmosDBConnectionString")
     if not cosmos_conn:
