@@ -1,0 +1,14 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "FUNCTIONS_WORKER_RUNTIME": "python",
+    "AzureWebJobsStorage": "",
+    "AzureCosmosDBConnectionString": "AccountEndpoint=https://group-coursework-cosmos-db-2526.documents.azure.com:443/;AccountKey=Noiuwh29CuITTQGsF9ny0GWP3qushd64LzlVvl2XpSBxtix3CVaRbghAv4ih4hnZJJ0rOvCbmLWWACDbV47EAQ==;",
+    "DatabaseName" : "university-database",
+    "LectureContainerName" : "lecture",
+    "LecturerContainerName" : "lecturer",
+    "StudentContainerName" : "student",
+    "DeploymentURL" : "https://groupcoursework-functionapp-2526.azurewebsites.net/api",
+    "FunctionAppKey" : "hsuAcj6yIqFu2S-duKquK2DXhpg85E_BZjvxPqrC84HmAzFuo27TyQ=="
+  }
+}

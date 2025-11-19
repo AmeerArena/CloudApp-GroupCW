@@ -72,8 +72,8 @@ def student_enroll(req: func.HttpRequest) -> func.HttpResponse:
 
     newStudent = {
         "id": str(uuid.uuid4()),
-        "username": student_name,
-        "password": student_modules,
+        "name": student_name,
+        "modules": student_modules,
         "attended_lectures": []
     }
 
