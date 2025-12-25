@@ -217,3 +217,5 @@ def lecture_make(req: func.HttpRequest) -> func.HttpResponse:
     return func.HttpResponse(
         json.dumps({"result": True, "msg": "OK"})
     )
+
+#helloiugytdrsxcfvgbhn
