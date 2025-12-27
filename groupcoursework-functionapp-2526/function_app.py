@@ -218,4 +218,13 @@ def lecture_make(req: func.HttpRequest) -> func.HttpResponse:
         json.dumps({"result": True, "msg": "OK"})
     )
 
-#helloiugytdrsxcfvgbhn
+#pars_json , return a json response that works with --> confirm working - comment,
+#validate date, cant book slot on date thats in the past - json response, comment
+#need a method to do get_grid status for 6x4 grid to check form building name, date its selstcted on, room within grid - return 6 slots with 3 differnt states - booked, available, you booked it - red, grey, green 
+#post method - lecterer can select location on valid dated - if booked by same lecturer booked same everything - error - cant double book themselves 
+#Can add extra booking 4-6 8-10 so can be added on same day 
+#3rd method - post - cancel lecture - can cancel or unselect booking within the grid - click again - grey 
+#student - view lecturer's booking - get method - student_view_lecture - return location and date of the booking, get lecturer's name /id, fetch lecturers booking for the date, return list of room and slot 
+#login lecturer - post 
+#Optional student enroll
+#lofin studnent - post 
