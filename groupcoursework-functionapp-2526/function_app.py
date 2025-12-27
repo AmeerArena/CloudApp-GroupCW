@@ -18,13 +18,13 @@ def get_cosmos_db():
     cosmos = CosmosClient.from_connection_string(cosmos_conn)
     return cosmos.get_database_client(db_name)
 
-# Gets the lecture container
+# Gets the lecture container -- Remove
 def get_lecture_container():
     db = get_cosmos_db()
     lecture_container_name = os.environ.get("LectureContainerName", "lecture")
     return db.get_container_client(lecture_container_name)
 
-# Gets the lecturer container
+# Gets the lecturer container -- Remove
 def get_lecturer_container():
     db = get_cosmos_db()
     lecturer_container_name = os.environ.get("LecturerContainerName", "lecturer")
