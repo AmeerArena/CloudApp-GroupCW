@@ -6,6 +6,41 @@ import os
 import uuid
 from azure.cosmos import CosmosClient
 
+# Helpers
+# Return JSON with propper content type and status code
+
+def json_resp(payload: dict, status: int = 200) -> func.HttpResponse:
+    return func.httpResponse(
+        body=json.dumps(payload),
+        status_code=status,
+        mimetype="application/json"
+    )
+
+# Safely parse JSON body
+# Return (data, error_response)
+def parse_json(req: func.HttpRequest):
+    try:
+        return req.get_json(), None
+    except Exception as e:
+        logging.error(f"JSON parse error: {e}")
+        return None, json_resp({"result": False, "msg": "not a correct json"}, status=400)
+    
+#Validate date format YYYY-MM-DD ensure that it is not the past
+# Return as (0k: bool, error_response: HttpResponse(None))
+def validate_data (date_str: str):
+    if not isinstance(date_str, str) or not date_str.strip():
+        return False, json_resp({"result": False, "msg": "date is required"}, status=400)
+    
+    try:
+        requested = datetime.datetime.strptime(date_str, "%Y-%m-%d").date()
+    except ValueError:
+        return False, json_resp({"result": False, "msg": "date format must be YYYY-MM-DD"}, status=400)
+    
+    today = datetime.now(datetime.timezone.utc)
+
+    if requested < today:
+        return False, json_resp({"result": False, "msg": "cannot book a date in the past"}, status=400)
+    
 app = func.FunctionApp()
 
 def get_cosmos_db():
@@ -41,48 +76,165 @@ def get_student_container():
 def student_enroll(req: func.HttpRequest) -> func.HttpResponse:
     logging.info('student/enroll')
 
-    try:
-        data = req.get_json()
-    except Exception as e:
-        logging.error(e)
-        return func.HttpResponse(
-            json.dumps({"result": False, "msg": "not a correct json"})
-        )
+    data, err = parse_json(req)
+    if err:
+        return err
 
-    student_name = data.get("name", "") # student name
-    student_modules = data.get("modules", []) # list of modules that the student is taking
-    
+    student_name = (data.get("name") or " ").strip()
+    student_modules = data.get("modules") or []
+
+    # validate student name
     if not student_name:
-        return func.HttpResponse(json.dumps({"result": False, "msg": "student must have a name"}))
-    
-    if not student_modules:
-        return func.HttpResponse(json.dumps({"result": False, "msg": "student must take at least 1 module"}))
+        return json_resp({"result": False, "msg": "student must have a name"}, status=400)
 
-    StudentContainer = get_student_container()
-    
-    students = list(StudentContainer.query_items(
-        query = "SELECT * FROM s WHERE s.name = @name",
-        parameters = [{"name": "@name", "value": student_name}],
-        enable_cross_partition_query = True
-    ))
-    if len(students) > 0:
-        return func.HttpResponse(
-            json.dumps({"result": False, "msg": "student already exists"})
+    # Validate student modules list
+    if not isinstance(student_modules, list) or len(student_modules) == 0:
+        return json_resp(
+            {"result": False, "msg": "student must take at least 1 module"},
+            status=400
         )
+    
+    #Clean and remove dupes module list
+    cleaned_modules = []
+    seen = set()
+    for m in student_modules:
+        if isinstance(m, str):
+            mm = m.strip()
+            if mm and mm not in seen:
+                seen.add(mm)
+                cleaned_modules.append(mm)
 
+    if not cleaned_modules:
+        return json_resp(
+            {"results": False, "msg": "modules must be valid strings"},
+            status=400
+        )
+    
+    StudentContainer = get_student_container()
+
+     # Checking if student exists
+    students = list(StudentContainer.query_items(
+        query= "SELECT * FROM s WHERE s.name =@name",
+        parameters=[{"name": "@name", "value": student_name}],
+        enable_cross_partition_query=True
+    ))
+
+    if students:
+        return json_resp(
+        {"result": False, "msg": "student already exists"},
+        status=409
+    )
+
+    #  Create new student document
     newStudent = {
         "id": str(uuid.uuid4()),
-        "name": student_name,
-        "modules": student_modules,
-        "attended_lectures": []
+        "name": cleaned_modules,
+        "lecturer_name": data.get("lecturer_name", "") #Optional, links lectuerer for student view
     }
 
-    StudentContainer.create_item(body = newStudent)
+    StudentContainer.create_item(body=newStudent)
+    return json_resp({"result": True, "msg": "OK"}, status=201)
+
+
+#Lecturer login
+# Login only if lecturer exists
+# JSON body example: { "name": "Dr. Alwash"}
+@app.route(route="lecturer/login", auth_level=func.AuthLevel.FUNCTION, methods=["POST"])
+def lecturer_login(req: func.HttpRequest) -> func.HttpResponse:
+    logging.info("lecturer/login")
+    data, err = parse_json(req)
+
+    if err:
+        return err
     
-    logging.info('new student')
-    return func.HttpResponse(
-        json.dumps({"result": True, "msg": "OK"})
-    )
+    lecturer_name = (data.get("name") or "").strip()
+    if not lecturer_name:
+        return json_resp(
+            {"result": False, "msg": "name is required"},
+            status=400
+        )
+    
+    LecturerContainer = get_lecturer_container()
+
+    lecturers = list(LecturerContainer.query_items(
+        query = "SELECT FROM 1 WHERE 1.name = @name",
+        parameters=[{"name": "@name", "value": lecturer_name}],
+        enable_cross_partition_query=True
+    ))
+
+    if not lecturers:
+        return json_resp(
+            {"result": False, "msg": "lecturer not found"},
+            status=404
+        )
+    
+    lecturer = lecturers[0]
+
+    #Ensuring booking array exists for grid
+    if "bookings" not in lecturer:
+        lecturer["bookings"] = []
+        LecturerContainer.replace_item(
+            item=lecturer["id"],
+            body=lecturer
+        )
+    
+    return json_resp({
+        "result": True,
+        "msg": "OK",
+        "lecturer": {
+            "id": lecturer.get("id"),
+            "name": lecturer.get("name"),
+            "modules": lecturer.get("modules", [])
+        }
+    })
+
+
+#Student login
+#Student allowed to login only if they exist
+#Example JSON body: { "name": "Aarfa"}
+@app.route(route="student/login", auth_level=func.AuthLevel.FUNCTION, methods=["POST"])
+def student_login(req: func.HttpRequest) -> func.HttpResponse:
+    logging.info("student/login")
+    data, err = parse_json(req)
+    if err:
+        return err
+    
+
+
+    student_name = (data.get("name") or "").strip()
+    if not student_name:
+        return json_resp(
+            {"result": False, "msg": "name is required"},
+            status=400
+        )
+
+    StudentContainer = get_student_container()
+
+    students = list(StudentContainer.quey_items(
+        query="SELECT * FROM s WHERE s.name = @name",
+        parameter=[{"name": "@name", "value": student_name}],
+        enable_cross_partition_query=True
+    ))
+
+    if not students:
+        return json_resp(
+            {"result": False, "msg": "student not found"},
+            status=404
+        )
+    
+    student = students[0]
+
+    return json_resp({
+        "result": True,
+        "msg": "OK",
+        "student": {
+            "id": student.get("id"),
+            "name": student.get("name"),
+            "modules": student.get("modules", []),
+            "lecturer_name": student.get("lecturer_name", "")
+        }
+    })
+
 
 # hire a lecturer. json: {"name":  "string" , "modules": ["module1","module2"]}
 @app.route(route="lecturer/hire", auth_level=func.AuthLevel.FUNCTION, methods=["POST"])
@@ -218,13 +370,23 @@ def lecture_make(req: func.HttpRequest) -> func.HttpResponse:
         json.dumps({"result": True, "msg": "OK"})
     )
 
-#pars_json , return a json response that works with --> confirm working - comment,
-#validate date, cant book slot on date thats in the past - json response, comment
-#need a method to do get_grid status for 6x4 grid to check form building name, date its selstcted on, room within grid - return 6 slots with 3 differnt states - booked, available, you booked it - red, grey, green 
-#post method - lecterer can select location on valid dated - if booked by same lecturer booked same everything - error - cant double book themselves 
-#Can add extra booking 4-6 8-10 so can be added on same day 
-#3rd method - post - cancel lecture - can cancel or unselect booking within the grid - click again - grey 
-#student - view lecturer's booking - get method - student_view_lecture - return location and date of the booking, get lecturer's name /id, fetch lecturers booking for the date, return list of room and slot 
-#login lecturer - post 
-#Optional student enroll
-#lofin studnent - post 
+#Done:
+# Students can be enrolled w/ names and modules
+# Student can login 
+# Lecturers "" ""
+# All resuponses return a clean JSON body
+# Invalid requests are rejected safeley
+# Dates in the past cannot be booked
+# Lecture databases exists but not used
+
+#TODO:
+#Get lecturer grid status (2 * 3 slots)
+# Grey = Empty, Red = booked by another lecturer, Green = Booked by current lecturer
+# Lecturer select slot (book room + time)
+# Prevent double booking of same slot
+# Lecturer cancel booking (uselect slot)
+# Student view lecturers booking for a given date
+
+# NOTE:
+# No lecture data is written to the lecture container
+# All booking data will be stored on lecturer records
