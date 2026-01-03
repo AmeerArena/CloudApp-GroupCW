@@ -3,15 +3,32 @@
 
     <%- include('header'); -%>
 
-    <h2 class="title">ECS Example Game</h2>
+    <h2 class="title text-center">Uni Sim</h2>
 
-    <div id="game">
-        <div v-if="connected">
-            <%- include('chat'); -%>
+    <div id="client">
+
+        <div v-if="!me">
+            <div v-if="page === 'login'">
+                <%- include('login'); -%>
+            </div>
+        
+            <div v-if="page === 'register'">
+                <%- include('registerStudent'); -%>
+            </div>
+            
+            <div v-if="page === 'registerLecturer'">
+                <%- include('registerLecturer'); -%>
+            </div>
         </div>
+    
+        <!-- APP -->
         <div v-else>
-            <p>Connecting...</p>
+            <div v-if="connected"></div>
+            <div v-else>
+                <p>Connecting...</p>
+            </div>
         </div>
+    
     </div>
 
     <%- include('footer'); -%>

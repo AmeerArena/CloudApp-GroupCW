@@ -1,0 +1,50 @@
+<div class="w-full max-w-md mx-auto text-center mt-5">
+
+    <div class="mb-4">
+        <h3 class="mb-2">Register as Student</h3>
+
+        <input
+            type="text"
+            v-model="registerName"
+            placeholder="Username"
+            class="form-control mb-3"
+        >
+
+        <input
+            type="password"
+            v-model="registerPassword"
+            placeholder="Password (8–12 chars)"
+            class="form-control mb-3"
+        >
+
+        <div v-for="(m, i) in registerModules" :key="i" class="mb-2">
+            <select v-model="registerModules[i]" class="form-control">
+                <option disabled value="">Select module {{ i + 1 }}</option>
+                <option v-for="mod in modules" :value="mod">
+                    {{ mod }}
+                </option>
+            </select>
+        </div>
+
+        <button
+            class="btn btn-success me-2"
+            @click="registerStudent"
+        >
+            Register
+        </button>
+
+        <p v-if="registerError" class="text-danger mt-3">
+            {{ registerError }}
+        </p>
+    </div>
+
+    <div class="mt-4">
+        <button
+            class="btn btn-secondary"
+            @click="goToLogin"
+        >
+            Back to login
+        </button>
+    </div>
+
+</div>

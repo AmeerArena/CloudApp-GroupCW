@@ -1,3 +1,4 @@
+
 import azure.functions as func
 import datetime
 import json
@@ -8,6 +9,24 @@ from azure.cosmos import CosmosClient
 
 app = func.FunctionApp()
 
+# Helpers
+# Return JSON with propper content type and status code
+def json_resp(payload: dict, status: int = 200) -> func.HttpResponse:
+    return func.HttpResponse(
+        body=json.dumps(payload),
+        status_code=status,
+        mimetype="application/json"
+    )
+
+# Safely parse JSON body
+# Return (data, error_response)
+def parse_json(req: func.HttpRequest):
+    try:
+        return req.get_json(), None
+    except Exception as e:
+        logging.error(f"JSON parse error: {e}")
+        return None, json_resp({"result": False, "msg": "not a correct json"}, status=400)
+     
 def get_cosmos_db():
     cosmos_conn = os.environ.get("AzureCosmosDBConnectionString")
     if not cosmos_conn:
@@ -18,7 +37,7 @@ def get_cosmos_db():
     cosmos = CosmosClient.from_connection_string(cosmos_conn)
     return cosmos.get_database_client(db_name)
 
-# Gets the lecture container
+# Gets the lecture container -- Remove
 def get_lecture_container():
     db = get_cosmos_db()
     lecture_container_name = os.environ.get("LectureContainerName", "lecture")
@@ -36,101 +55,371 @@ def get_student_container():
     student_container_name = os.environ.get("StudentContainerName", "student")
     return db.get_container_client(student_container_name)
 
-# enroll a student. json: {"name":  "string" , "modules": ["module1","module2"]}
+# Fixed uni modules
+ALLOWED_MODULES = {
+        "BIOM1",
+        "BIOM2",
+        "BIOM3",
+        "COMP1",
+        "COMP2",
+        "COMP3",
+        "ELEC1",
+        "ELEC2",
+        "ELEC3",
+        "MATH1",
+        "MATH2",
+        "MATH3"
+    }
+
+# enroll a student. json: {"name": "string", "password": "string", "modules": ["MODL1","MODL2"]}
 @app.route(route="student/enroll", auth_level=func.AuthLevel.FUNCTION, methods=["POST"])
 def student_enroll(req: func.HttpRequest) -> func.HttpResponse:
     logging.info('student/enroll')
 
-    try:
-        data = req.get_json()
-    except Exception as e:
-        logging.error(e)
-        return func.HttpResponse(
-            json.dumps({"result": False, "msg": "not a correct json"})
+    data, err = parse_json(req)
+    if err:
+        return err
+
+    student_name = (data.get("name") or "").strip()
+    student_password = (data.get("password") or "").strip()
+    student_modules = data.get("modules") or []
+
+    # Validate student name
+    if not student_name:
+        return json_resp(
+            {"result": False, "msg": "student must have a name"},
+            status=400
         )
 
-    student_name = data.get("name", "") # student name
-    student_modules = data.get("modules", []) # list of modules that the student is taking
-    
-    if not student_name:
-        return func.HttpResponse(json.dumps({"result": False, "msg": "student must have a name"}))
-    
-    if not student_modules:
-        return func.HttpResponse(json.dumps({"result": False, "msg": "student must take at least 1 module"}))
+    # Validate student password
+    if not student_password:
+        return json_resp(
+            {"result": False, "msg": "student must have a password"},
+            status=400
+        )
+
+    if len(student_password) < 8 or len(student_password) > 12:
+        return json_resp(
+            {
+                "result": False,
+                "msg": "password must be between 8 and 12 characters long"
+            },
+            status=400
+        )
+
+    # Validate modules list exist
+    if not isinstance(student_modules, list) or len(student_modules) == 0:
+        return json_resp(
+            {"result": False, "msg": "student must provide modules"},
+            status=400
+        )
+
+    # Clean modules, remove duplicates
+    cleaned_modules = []
+    seen = set()
+
+    for m in student_modules:
+        if isinstance(m, str):
+            mm = m.strip()
+            if mm and mm not in seen:
+                seen.add(mm)
+                cleaned_modules.append(mm)
+
+    if not cleaned_modules:
+        return json_resp(
+            {"result": False, "msg": "modules must be valid strings"},
+            status=400
+        )
+
+    # Exactly 4 modules
+    if len(cleaned_modules) != 4:
+        return json_resp(
+            {"result": False, "msg": "students must have 4 modules"},
+            status=400
+        )
+
+    # Validate modules
+    invalid_modules = [m for m in cleaned_modules if m not in ALLOWED_MODULES]
+    if invalid_modules:
+        return json_resp(
+            {
+                "result": False,
+                "msg": "invalid module(s)",
+                "invalid": invalid_modules,
+                "allowed": sorted(ALLOWED_MODULES)
+            },
+            status=400
+        )
 
     StudentContainer = get_student_container()
-    
+
+    # Check if student already exists
     students = list(StudentContainer.query_items(
-        query = "SELECT * FROM s WHERE s.name = @name",
-        parameters = [{"name": "@name", "value": student_name}],
-        enable_cross_partition_query = True
+        query="SELECT * FROM s WHERE s.name = @name",
+        parameters=[{"name": "@name", "value": student_name}],
+        enable_cross_partition_query=True
     ))
-    if len(students) > 0:
-        return func.HttpResponse(
-            json.dumps({"result": False, "msg": "student already exists"})
+
+    if students:
+        return json_resp(
+            {"result": False, "msg": "student already exists"},
+            status=409
         )
 
-    newStudent = {
+    # Create student document
+    new_student = {
         "id": str(uuid.uuid4()),
         "name": student_name,
-        "modules": student_modules,
-        "attended_lectures": []
+        "password": student_password,
+        "modules": cleaned_modules,
     }
 
-    StudentContainer.create_item(body = newStudent)
-    
-    logging.info('new student')
-    return func.HttpResponse(
-        json.dumps({"result": True, "msg": "OK"})
+    StudentContainer.create_item(body=new_student)
+
+    return json_resp({"result": True, "msg": "OK"}, status=201)
+
+# Student login
+# Example JSON body: { "name": "Aarfa", "password": "Password1" }
+@app.route(route="student/login", auth_level=func.AuthLevel.FUNCTION, methods=["POST"])
+def student_login(req: func.HttpRequest) -> func.HttpResponse:
+    logging.info("student/login")
+
+    data, err = parse_json(req)
+    if err:
+        return err
+
+    student_name = (data.get("name") or "").strip()
+    student_password = (data.get("password") or "").strip()
+
+    # Validate student name
+    if not student_name:
+        return json_resp(
+            {"result": False, "msg": "name is required"},
+            status=400
+        )
+
+    # Validate student password
+    if not student_password:
+        return json_resp(
+            {"result": False, "msg": "password is required"},
+            status=400
+        )
+
+    StudentContainer = get_student_container()
+
+    students = list(StudentContainer.query_items(
+        query="SELECT * FROM s WHERE s.name = @name",
+        parameters=[{"name": "@name", "value": student_name}],
+        enable_cross_partition_query=True
+    ))
+
+    if not students:
+        return json_resp(
+            {"result": False, "msg": "student not found"},
+            status=404
+        )
+
+    student = students[0]
+
+    # Check password
+    if student.get("password") != student_password:
+        return json_resp(
+            {"result": False, "msg": "password or name incorrect"},
+            status=401
+        )
+
+    return json_resp(
+        {
+            "result": True,
+            "msg": "OK",
+            "student": {
+                "id": student.get("id"),
+                "name": student.get("name"),
+                "modules": student.get("modules", [])
+            }
+        },
+        status=200
     )
 
-# hire a lecturer. json: {"name":  "string" , "modules": ["module1","module2"]}
+
+# hire a lecturer
+# json: {"name": "string", "password": "string", "modules": ["MOD1","MOD2","MOD3"]}
 @app.route(route="lecturer/hire", auth_level=func.AuthLevel.FUNCTION, methods=["POST"])
 def lecturer_hire(req: func.HttpRequest) -> func.HttpResponse:
-    logging.info('lecturer/hire')
+    logging.info("lecturer/hire")
 
-    try:
-        data = req.get_json()
-    except Exception as e:
-        logging.error(e)
-        return func.HttpResponse(
-            json.dumps({"result": False, "msg": "not a correct json"})
+    data, err = parse_json(req)
+    if err:
+        return err
+
+    lecturer_name = (data.get("name") or "").strip()
+    lecturer_password = (data.get("password") or "").strip()
+    lecturer_modules = data.get("modules") or []
+
+    # Validate name
+    if not lecturer_name:
+        return json_resp(
+            {"result": False, "msg": "lecturer must have a name"},
+            status=400
         )
 
-    lecturer_name = data.get("name", "") # lecturer name
-    lecturer_modules = data.get("modules", []) # list of modules that the lecturer teaches
-    
-    if not lecturer_name:
-        return func.HttpResponse(json.dumps({"result": False, "msg": "lecturer must have a name"}))
-    
-    if not lecturer_modules:
-        return func.HttpResponse(json.dumps({"result": False, "msg": "lecturer must teach at least 1 module"}))
+    # Validate password
+    if not lecturer_password:
+        return json_resp(
+            {"result": False, "msg": "lecturer must have a password"},
+            status=400
+        )
+
+    if len(lecturer_password) < 8 or len(lecturer_password) > 12:
+        return json_resp(
+            {"result": False, "msg": "password must be between 8 and 12 characters long"},
+            status=400
+        )
+
+    # Validate modules list
+    if not isinstance(lecturer_modules, list) or len(lecturer_modules) == 0:
+        return json_resp(
+            {"result": False, "msg": "lecturer must provide modules"},
+            status=400
+        )
+
+    # Clean modules (remove duplicates)
+    cleaned_modules = []
+    seen = set()
+
+    for m in lecturer_modules:
+        if isinstance(m, str):
+            mm = m.strip()
+            if mm and mm not in seen:
+                seen.add(mm)
+                cleaned_modules.append(mm)
+
+    if not cleaned_modules:
+        return json_resp(
+            {"result": False, "msg": "modules must be valid strings"},
+            status=400
+        )
+
+    # Exactly 3 modules
+    if len(cleaned_modules) != 3:
+        return json_resp(
+            {"result": False, "msg": "lecturers must have exactly 3 modules"},
+            status=400
+        )
+
+    # Validate allowed modules
+    invalid_modules = [m for m in cleaned_modules if m not in ALLOWED_MODULES]
+    if invalid_modules:
+        return json_resp(
+            {
+                "result": False,
+                "msg": "invalid module(s)",
+                "invalid": invalid_modules,
+                "allowed": sorted(ALLOWED_MODULES)
+            },
+            status=400
+        )
 
     LecturerContainer = get_lecturer_container()
-    
+
+    # Check if lecturer already exists
     lecturers = list(LecturerContainer.query_items(
-        query = "SELECT * FROM l WHERE l.name = @name",
-        parameters = [{"name": "@name", "value": lecturer_name}],
-        enable_cross_partition_query = True
+        query="SELECT * FROM l WHERE l.name = @name",
+        parameters=[{"name": "@name", "value": lecturer_name}],
+        enable_cross_partition_query=True
     ))
-    if len(lecturers) > 0:
-        return func.HttpResponse(
-            json.dumps({"result": False, "msg": "lecturer already exists"})
+
+    if lecturers:
+        return json_resp(
+            {"result": False, "msg": "lecturer already exists"},
+            status=409
         )
 
-    newLecturer = {
+    # Create lecturer document
+    new_lecturer = {
         "id": str(uuid.uuid4()),
         "name": lecturer_name,
-        "modules": lecturer_modules,
-        "lectures": []
+        "password": lecturer_password,
+        "modules": cleaned_modules,
+        "lectures": [],
+        "bookings": []
     }
 
-    LecturerContainer.create_item(body = newLecturer)
-    
-    logging.info('new lecturer')
-    return func.HttpResponse(
-        json.dumps({"result": True, "msg": "OK"})
+    LecturerContainer.create_item(body=new_lecturer)
+
+    return json_resp({"result": True, "msg": "OK"}, status=201)
+
+# Lecturer login
+# JSON body example: { "name": "Dr. Alwash", "password": "Password1" }
+@app.route(route="lecturer/login", auth_level=func.AuthLevel.FUNCTION, methods=["POST"])
+def lecturer_login(req: func.HttpRequest) -> func.HttpResponse:
+    logging.info("lecturer/login")
+
+    data, err = parse_json(req)
+    if err:
+        return err
+
+    lecturer_name = (data.get("name") or "").strip()
+    lecturer_password = (data.get("password") or "").strip()
+
+    # Validate name
+    if not lecturer_name:
+        return json_resp(
+            {"result": False, "msg": "name is required"},
+            status=400
+        )
+
+    # Validate password
+    if not lecturer_password:
+        return json_resp(
+            {"result": False, "msg": "password is required"},
+            status=400
+        )
+
+    LecturerContainer = get_lecturer_container()
+
+    lecturers = list(LecturerContainer.query_items(
+        query="SELECT * FROM l WHERE l.name = @name",
+        parameters=[{"name": "@name", "value": lecturer_name}],
+        enable_cross_partition_query=True
+    ))
+
+    if not lecturers:
+        return json_resp(
+            {"result": False, "msg": "lecturer not found"},
+            status=404
+        )
+
+    lecturer = lecturers[0]
+
+    # Check password
+    if lecturer.get("password") != lecturer_password:
+        return json_resp(
+            {"result": False, "msg": "password or name incorrect"},
+            status=401
+        )
+
+    # Ensure bookings array exists
+    if "bookings" not in lecturer:
+        lecturer["bookings"] = []
+        LecturerContainer.replace_item(
+            item=lecturer["id"],
+            body=lecturer
+        )
+
+    return json_resp(
+        {
+            "result": True,
+            "msg": "OK",
+            "lecturer": {
+                "id": lecturer.get("id"),
+                "name": lecturer.get("name"),
+                "modules": lecturer.get("modules", [])
+            }
+        },
+        status=200
     )
+
 
 # make a lecture. json:
 # {"title": "string", "module": "string", "lecturer": "string", "date": "string", "time": "string"}
@@ -217,3 +506,24 @@ def lecture_make(req: func.HttpRequest) -> func.HttpResponse:
     return func.HttpResponse(
         json.dumps({"result": True, "msg": "OK"})
     )
+
+#Done:
+# Students can be enrolled w/ names and modules
+# Student can login 
+# Lecturers "" ""
+# All resuponses return a clean JSON body
+# Invalid requests are rejected safeley
+# Dates in the past cannot be booked
+# Lecture databases exists but not used
+
+#TODO:
+#Get lecturer grid status (2 * 3 slots)
+# Grey = Empty, Red = booked by another lecturer, Green = Booked by current lecturer
+# Lecturer select slot (book room + time)
+# Prevent double booking of same slot
+# Lecturer cancel booking (uselect slot)
+# Student view lecturers booking for a given date
+
+# NOTE:
+# No lecture data is written to the lecture container
+# All booking data will be stored on lecturer records

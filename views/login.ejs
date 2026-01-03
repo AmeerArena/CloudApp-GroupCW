@@ -1,0 +1,54 @@
+<div class="w-full max-w-md mx-auto text-center mt-5">
+
+    <div class="mb-4">
+        <h3 class="mb-2">Login</h3>
+        <input
+            type="text"
+            placeholder="Username"
+            v-model="loginName"
+            class="form-control mb-3"
+        >
+
+        <input
+            type="password"
+            placeholder="Password"
+            v-model="loginPassword"
+            class="form-control mb-3"
+        >
+
+        <button
+            class="btn btn-primary me-2"
+            @click="loginStudent"
+        >
+            Login as student
+        </button>
+
+        <button
+            class="btn btn-primary me-2"
+            @click="loginLecturer"
+        >
+            Login as lecturer
+        </button>
+
+        <p v-if="loginError" class="text-danger mt-3">
+            {{ loginError }}
+        </p>
+    </div>
+
+    <div class="mt-4">
+        <button
+            class="btn btn-secondary"
+            @click="goToRegister"
+        >
+            Register as Student
+        </button>
+
+        <button
+            class="btn btn-secondary"
+            @click="goToLecturerRegister"
+        >
+            Register as Lecturer
+        </button>
+    </div>
+
+</div>

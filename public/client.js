@@ -1,68 +1,167 @@
 var socket = null;
 
-// Prepare client
 var app = new Vue({
     el: '#client',
     data: {
         connected: false,
-        // Student enroll data
-        studentName: '',
-        studentModules: '',
-        enrollResult: ''
+
+        // login
+        me: null,
+        loginName: '',
+        loginPassword: '',
+        loginError: '',
+
+        // page state
+        page: 'login',
+
+        // student register
+        registerName: '',
+        registerPassword: '',
+        registerModules: ['', '', '', ''],
+        registerError: '',
+
+        lecturerRegisterName: '',
+        lecturerRegisterPassword: '',
+        lecturerRegisterModules: ['', '', ''],
+        lecturerRegisterError: '',
+
+        modules: [
+            "BIOM1","BIOM2","BIOM3",
+            "COMP1","COMP2","COMP3",
+            "ELEC1","ELEC2","ELEC3",
+            "MATH1","MATH2","MATH3"
+        ]
     },
-    mounted: function() {
+    mounted() {
         connect();
     },
     methods: {
-        // enroll student
-        enrollStudent() {
-            if (!this.studentName || !this.studentModules) {
-                this.enrollResult = 'Please fill in all fields';
+        loginStudent() {
+            this.loginError = '';
+
+            if (!socket || !this.connected) {
+                this.loginError = 'Not connected to server';
                 return;
             }
 
-            const modules = this.studentModules
-                .split(',')
-                .map(m => m.trim())
-                .filter(m => m.length > 0);
+            socket.emit('student:login', {
+                username: this.loginName,
+                password: this.loginPassword
+            });
+        },
 
-            fetch('/api/student/enroll', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    name: this.studentName,
-                    modules: modules
-                })
-            })
-            .then(res => res.json())
-            .then(data => {
-                this.enrollResult = data.msg;
-                if (data.result) {
-                    this.studentName = '';
-                    this.studentModules = '';
-                }
-            })
-            .catch(() => {
-                this.enrollResult = 'Server error';
+        loginLecturer() {
+            this.loginError = '';
+
+            if (!socket || !this.connected) {
+                this.loginError = 'Not connected to server';
+                return;
+            }
+        
+            socket.emit('lecturer:login', {
+                username: this.loginName,
+                password: this.loginPassword
+            });
+        },
+
+        goToRegister() {
+            this.page = 'register';
+        },
+
+        goToLecturerRegister() {
+            this.page = 'registerLecturer';
+            this.registerError = '';
+        },
+
+        goToLogin() {
+            this.page = 'login';
+            this.registerError = '';
+        },
+
+        registerStudent() {
+            this.registerError = '';
+
+            const modules = this.registerModules.filter(Boolean);
+
+            socket.emit('student:register', {
+                name: this.registerName,
+                password: this.registerPassword,
+                modules
+            });
+        },
+
+        registerLecturer() {
+            this.lecturerRegisterError = '';
+
+            const modules = this.lecturerRegisterModules.filter(Boolean);
+
+            socket.emit('lecturer:register', {
+                name: this.lecturerRegisterName,
+                password: this.lecturerRegisterPassword,
+                modules
             });
         }
     }
 });
 
 function connect() {
-    // Prepare web socket
+    if (socket) return;
+
     socket = io();
 
-    socket.on('connect', function() {
+    socket.on('connect', function () {
+        console.log('Socket connected');
         app.connected = true;
     });
 
-    socket.on('connect_error', function(message) {
-        alert('Unable to connect: ' + message);
+    // Login student
+    socket.on('login:error', (msg) => {
+        app.loginError = msg;
     });
 
-    socket.on('disconnect', function() {
-        alert('Disconnected');
+    socket.on('student:login:result', (data) => {
+        console.log('LOGIN RESULT:', data);
+        app.me = data.student || data;
+    });
+
+    // Login lecturer
+    socket.on('lecturer:login:error', (msg) => {
+        app.loginError = msg;
+    });
+
+    socket.on('lecturer:login:result', (data) => {
+        console.log('LECTURER LOGIN RESULT:', data);
+        app.me = data.lecturer || data;
+    });
+
+    // Register student
+    socket.on('register:error', (msg) => {
+        app.registerError = msg;
+    });
+    
+    socket.on('student:register:result', () => {
+        app.page = 'login';
+        app.registerName = '';
+        app.registerPassword = '';
+        app.registerModules = ['', '', '', ''];
+    });
+
+    // Register lecturer
+    socket.on('lecturer:register:error', (msg) => {
+        app.lecturerRegisterError = msg;
+    });
+    
+    socket.on('lecturer:register:result', () => {
+        app.page = 'login';
+        app.lecturerRegisterName = '';
+        app.lecturerRegisterPassword = '';
+        app.lecturerRegisterModules = ['', '', ''];
+    });
+
+    socket.on('disconnect', function () {
+        console.log('Socket disconnected');
         app.connected = false;
+        socket = null;
     });
 }
+
