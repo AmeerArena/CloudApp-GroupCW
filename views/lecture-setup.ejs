@@ -1,0 +1,40 @@
+<%- include('header'); -%>
+
+<div class="mx-auto" style="max-width: 720px;">
+  <h1 class="title mb-4 text-center">Lecture Setup</h1>
+
+  <div class="card p-4">
+    <form action="/api/lecture/make" method="post">
+      <div class="mb-3">
+        <input class="form-control form-control-lg" type="text" name="title" placeholder="(lecture Title)" required>
+      </div>
+
+      <div class="mb-3">
+        <input class="form-control form-control-lg" type="text" name="module" placeholder="(lecture module)" required>
+      </div>
+
+      <div class="mb-3">
+        <input class="form-control form-control-lg" type="text" name="lecturer" placeholder="(lecturer username)" required>
+      </div>
+
+      <div class="row g-3 mb-3">
+        <div class="col-6">
+          <input class="form-control form-control-lg" type="date" name="date" required>
+        </div>
+        <div class="col-6">
+          <input class="form-control form-control-lg" type="time" name="time" required>
+        </div>
+      </div>
+
+      <div class="d-grid">
+        <button class="btn btn-outline-dark btn-lg" type="submit">start lecture</button>
+      </div>
+
+      <div class="text-center text-danger mt-3" style="min-height: 24px;">
+        <%= error ? error : '[error messages]' %>
+      </div>
+    </form>
+  </div>
+</div>
+
+<%- include('footer'); -%>

@@ -1,29 +1,30 @@
-<!doctype html>
-<html lang="en">
-  <%- include('header'); -%>
+<%- include('header'); -%>
 
-  <div id="client">
-    <h2 class="title mb-4">Student Enrollment</h2>
+<div id="client" class="mx-auto" style="max-width: 720px;">
+  <h2 class="title mb-4 text-center">Student Enrollment</h2>
 
-    <div class="card p-4 mb-4">
-      <div class="mb-3">
-        <label class="form-label">Student Name</label>
-        <input type="text" class="form-control" v-model="studentName">
-      </div>
-
-      <div class="mb-3">
-        <label class="form-label">Modules (comma separated)</label>
-        <input type="text" class="form-control" v-model="studentModules" placeholder="CS101, CS102">
-      </div>
-
-      <button class="btn btn-primary" v-on:click="enrollStudent">
-        Enroll
-      </button>
-
-      <div class="mt-3" v-if="enrollResult">
-        <div class="alert alert-info">{{ enrollResult }}</div>
-      </div>
+  <div class="card p-4 mb-4">
+    <div class="mb-3">
+      <label class="form-label">Student Name</label>
+      <input type="text" class="form-control" v-model="studentName">
     </div>
-    
-  <%- include('footer'); -%>
-</html>
+
+    <div class="mb-3">
+      <label class="form-label">Password</label>
+      <input type="password" class="form-control" v-model="studentPassword">
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label">Modules (comma separated)</label>
+      <input type="text" class="form-control" v-model="studentModules" placeholder="COMP3204, COMP2216">
+    </div>
+
+    <button class="btn btn-outline-dark btn-lg" v-on:click="enrollStudent">Enroll</button>
+
+    <div class="mt-3" v-if="enrollResult">
+      <div class="alert alert-info">{{ enrollResult }}</div>
+    </div>
+  </div>
+</div>
+
+<%- include('footer'); -%>

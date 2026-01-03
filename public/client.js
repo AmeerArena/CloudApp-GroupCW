@@ -7,6 +7,7 @@ var app = new Vue({
         connected: false,
         // Student enroll data
         studentName: '',
+        studentPassword: '',
         studentModules: '',
         enrollResult: ''
     },
@@ -16,7 +17,7 @@ var app = new Vue({
     methods: {
         // enroll student
         enrollStudent() {
-            if (!this.studentName || !this.studentModules) {
+            if (!this.studentName || !this.studentPassword || !this.studentModules) {
                 this.enrollResult = 'Please fill in all fields';
                 return;
             }
@@ -31,6 +32,7 @@ var app = new Vue({
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     name: this.studentName,
+                    password: this.studentPassword,
                     modules: modules
                 })
             })
@@ -39,6 +41,7 @@ var app = new Vue({
                 this.enrollResult = data.msg;
                 if (data.result) {
                     this.studentName = '';
+                    this.studentPassword = '';
                     this.studentModules = '';
                 }
             })
