@@ -1,0 +1,32 @@
+<%- include('header'); -%>
+
+<div class="mx-auto" style="max-width: 720px;">
+  <h1 class="title mb-4 text-center">Login</h1>
+
+  <div class="card p-4">
+    <form action="/homepage" method="get">
+      <div class="mb-3">
+        <input class="form-control form-control-lg" type="text" placeholder="(username)" required>
+      </div>
+
+      <div class="mb-3">
+        <input class="form-control form-control-lg" type="password" placeholder="(password)" required>
+      </div>
+
+      <div class="d-grid">
+        <button class="btn btn-outline-dark btn-lg" type="submit">login</button>
+      </div>
+
+      <div class="text-center text-danger mt-3" style="min-height: 24px;">
+        <%= error ? error : '[error messages]' %>
+      </div>
+    </form>
+  </div>
+
+  <div class="d-flex justify-content-between mt-5">
+    <a class="btn btn-outline-dark btn-lg px-5" href="/register/lecturer">register as Lecturer</a>
+    <a class="btn btn-outline-dark btn-lg px-5" href="/register/student">register as Student</a>
+  </div>
+</div>
+
+<%- include('footer'); -%>

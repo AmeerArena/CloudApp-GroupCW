@@ -1,0 +1,37 @@
+<%- include('header'); -%>
+
+<div class="mb-3">
+  <a class="btn btn-outline-dark" href="/homepage">←</a>
+</div>
+
+<div class="row g-4">
+  <div class="col-md-8">
+    <h2 class="mb-3">[Lecture Title]</h2>
+    <div class="d-flex justify-content-between mb-2">
+      <div>[Lecturer username]</div>
+      <div>[Lecture Module]</div>
+    </div>
+
+    <div class="border border-dark bg-white" style="height: 520px;"></div>
+    <div class="mt-2">Board: Only the current Lecturer can write lines on the board.</div>
+  </div>
+
+  <div class="col-md-4">
+    <div class="border border-dark bg-white p-3" style="height: 620px; display: flex; flex-direction: column;">
+      <div class="fw-bold mb-3">Student Questions Area: Students can post questions and the lecturer can respond to them.</div>
+
+      <div class="border border-dark p-2 mb-3" style="flex: 1;">
+        <div class="mb-2">(Student Name)</div>
+        <div class="border-top pt-2 mb-2">(Question)</div>
+        <div class="border-top pt-2">(Lecturer can answer here so all to see)</div>
+      </div>
+
+      <div class="input-group">
+        <input class="form-control" placeholder="student write question">
+        <button class="btn btn-outline-dark" type="button">→</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%- include('footer'); -%>
