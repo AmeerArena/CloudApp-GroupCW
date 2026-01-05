@@ -506,7 +506,131 @@ def lecture_make(req: func.HttpRequest) -> func.HttpResponse:
         json.dumps({"result": True, "msg": "OK"})
     )
 
+@app.route(route="lecture/setModule", auth_level=func.AuthLevel.FUNCTION, methods=["POST"])
+def lecture_set_module(req: func.HttpRequest) -> func.HttpResponse:
+    logging.info("lecture/setModule")
 
+    data, err = parse_json(req)
+    if err:
+        return err
+    
+    room_id = (data.get("roomId") or "").strip()
+    lecturer_name = (data.get("lecturer") or "").strip()
+    module = (data.get("module") or "").strip()
+
+    if not room_id:
+        return json_resp({"result": False, "msg": "roomId is required"}, status=400)
+    if not lecturer_name:
+        return json_resp({"result": False, "msg": "lecturer is required"}, status=400)
+    if not module:
+        return json_resp ({"result": False, "msg": "module is required"}, status=400)
+    
+    LecturerContainter=get_lecturer_container()
+    RoomContainer = get_lecture_container()
+
+    #Simple query if the lecture exists
+    lecturers=list(LecturerContainter.query_items(
+        query="SELECT * FROM l WHERE l.name =@name",
+        parameters=({"name": "@name", "value": lecturer_name}),
+        enable_cross_partition_query=True
+    ))
+
+    if not lecturers:
+        return json_resp({"result": False, "msg": "lecturer not found"}, status=404)
+    
+    lecturer = lecturers[0]
+    if module not in lecturer.get("modules", []):
+        return json_resp(
+            {"result": False, "msg": "lecturer does not teach this module", "allowed": lecturer.get("modules", [])},
+            status=400
+        )
+    
+    # Query to Get room docs or create if missing
+    room_docs = list(RoomContainer.query_items(
+        query="SELECT * FROM r WHERE r.roomId = @rid OR r.id = @rid",
+        parameters=[{"name": "@rid", "value": room_id}],
+        enable_cross_partition_query=True
+    ))
+    if room_docs:
+        room = room_docs[0]
+    else:
+        room = {"id": room_id, "roomId": room_id, "status": "empty", "module": None, "lecturer": None, "startedAt": None}
+        RoomContainer.create_item(body=room)
+        room = list(RoomContainer.query_items(
+            query="SELECT * FROM r WHERE r.id = @r.id",
+            parameters=[{"name": "@rid", "value": room_id}],
+            enable_cross_partition_query=True
+        ))[0]
+
+@app.route(route="lecture/setLecturer", auth_level=func.AuthLevel.FUNCTION, methods=["POST"])
+def lecture_set_lecturer(req: func.HttpRequest) -> func.HttpResponse:
+    logging.info("lecture/setLecturer")
+
+    data, err = parse_json(req)
+    if err:
+        return err
+    
+    room_id = (data.get("roomId") or "").strip()
+    lecturer_name = (data.get("lecturer") or "").strip()
+    action = (data.get("action") or "").strip().lower()
+
+    if not room_id:
+        return json_resp({"result": False, "msg": "roomId is required"}, status=400)
+    if not lecturer_name:
+        return json_resp({"result": False, "msg": "lecturer is required"}, status=400)
+    if action not in ("start", "end"):
+        return json_resp({"result": False, "msg": "action must be 'start' or 'end'"}, status=400)
+    
+    LecturerContainer = get_lecturer_container()
+    RoomContainer = get_lecture_container()
+
+    # Query to check if the lecture exists
+    lecturers = list(LecturerContainer.query_items(
+        query="SELECT * FROM l WHERE l.name = @name",
+        parameters=[{"name": "@name", "value": lecturer_name}],
+        enable_cross_partition_query=True
+    ))
+
+    if not lecturers:
+        return json_resp({"result": False, "msg": "lecturer not fond"}, status=404)
+    
+    # Query to Get room docs or create if missing
+    room_docs = list(RoomContainer.query_items(
+        query="SELECT * FROM r WHERE r.roomId = @rid OR r.id = @rid",
+        parameters=[{"name": "@rid", "value": room_id}],
+        enable_cross_partition_query=True
+    ))
+    if room_docs:
+        room = room_docs[0]
+    else:
+        room = {"id": room_id, "roomId": room_id, "status": "empty", "module": None, "lecturer": None, "startedAt": None}
+        RoomContainer.create_item(body=room)
+        room = list(RoomContainer.query_items(
+            query="SELECT * FROM r WHERE r.id = @r.id",
+            parameters=[{"name": "@rid", "value": room_id}],
+            enable_cross_partition_query=True
+        ))[0]
+    
+    # Other lecturer cannot take away another lecturers room
+    if action == "start":
+        if room.get("lecturer") and room["lecturer"] != lecturer_name:
+            return json_resp({"result": False, "msg": "room already booked by another lecturer"}, status=409)
+        
+        room["lecturer"] = lecturer_name
+        room["status"] = "booked"
+        room["startedAt"] = datetime.datetime.now(datetime.timezone.utc).isoformat() + "Z"
+        return json_resp({"result": True, "msg": "lecturer set", "room": room}, status=200)
+    
+    #End
+    else:
+        if room.get("lecturer") != lecturer_name:
+            return json_resp({"result": False, "msg": "you can only end your own lecture"}, status=403)
+        
+        room["lecturer"] = None
+        room["status"] = "empty"
+        room["startedAt"] = None
+        RoomContainer.replace_item(item=room["id"], body=room)
+        return json_resp({"result": True, "msg": "lecturer cleared", "room": room}, status=200)
 
 
 # helpers for new lecture APIs
