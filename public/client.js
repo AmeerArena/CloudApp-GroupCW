@@ -114,7 +114,7 @@ var app = new Vue({
                 return;
             }
             socket.emit('lecture:setup', {
-                title: this.roomId,
+                roomId: this.roomId,
                 module: this.selectedModule
             });
         },
@@ -167,6 +167,7 @@ function connect() {
     socket.on('student:login:result', (data) => {
         console.log('LOGIN RESULT:', data);
         app.me = data.student || data;
+        app.goToMain();
     });
 
     // Login lecturer
@@ -177,6 +178,7 @@ function connect() {
     socket.on('lecturer:login:result', (data) => {
         console.log('LECTURER LOGIN RESULT:', data);
         app.me = data.lecturer || data;
+        app.goToMain();
     });
 
     // Register student
