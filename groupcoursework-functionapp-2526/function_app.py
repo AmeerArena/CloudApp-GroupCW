@@ -623,7 +623,6 @@ def lecture_set_lecturer(req: func.HttpRequest) -> func.HttpResponse:
         return json_resp({"result": True, "msg": "lecturer set", "room": room}, status=200)
     
     #End
-
     else:
         if room.get("lecturer") != lecturer_name:
             return json_resp({"result": False, "msg": "you can only end your own lecture"}, status=403)
