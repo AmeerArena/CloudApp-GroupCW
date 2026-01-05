@@ -506,26 +506,8 @@ def lecture_make(req: func.HttpRequest) -> func.HttpResponse:
         json.dumps({"result": True, "msg": "OK"})
     )
 
-#Done:
-# Students can be enrolled w/ names and modules
-# Student can login 
-# Lecturers "" ""
-# All resuponses return a clean JSON body
-# Invalid requests are rejected safeley
-# Dates in the past cannot be booked
-# Lecture databases exists but not used
 
-#TODO:
-#Get lecturer grid status (2 * 3 slots)
-# Grey = Empty, Red = booked by another lecturer, Green = Booked by current lecturer
-# Lecturer select slot (book room + time)
-# Prevent double booking of same slot
-# Lecturer cancel booking (uselect slot)
-# Student view lecturers booking for a given date
 
-# NOTE:
-# No lecture data is written to the lecture container
-# All booking data will be stored on lecturer records
 
 # helpers for new lecture APIs
 def clean_unique_modules(mods):
