@@ -1,4 +1,3 @@
-
 import azure.functions as func
 import datetime
 import json
@@ -420,7 +419,6 @@ def lecturer_login(req: func.HttpRequest) -> func.HttpResponse:
         status=200
     )
 
-
 # make a lecture. json:
 # {"title": "string", "module": "string", "lecturer": "string", "date": "string", "time": "string"}
 @app.route(route="lecture/make", auth_level=func.AuthLevel.FUNCTION, methods=["POST"])
@@ -507,23 +505,348 @@ def lecture_make(req: func.HttpRequest) -> func.HttpResponse:
         json.dumps({"result": True, "msg": "OK"})
     )
 
-#Done:
-# Students can be enrolled w/ names and modules
-# Student can login 
-# Lecturers "" ""
-# All resuponses return a clean JSON body
-# Invalid requests are rejected safeley
-# Dates in the past cannot be booked
-# Lecture databases exists but not used
+@app.route(route="lecture/setModule", auth_level=func.AuthLevel.FUNCTION, methods=["POST"])
+def lecture_set_module(req: func.HttpRequest) -> func.HttpResponse:
+    logging.info("lecture/setModule")
 
-#TODO:
-#Get lecturer grid status (2 * 3 slots)
-# Grey = Empty, Red = booked by another lecturer, Green = Booked by current lecturer
-# Lecturer select slot (book room + time)
-# Prevent double booking of same slot
-# Lecturer cancel booking (uselect slot)
-# Student view lecturers booking for a given date
+    data, err = parse_json(req)
+    if err:
+        return err
+    
+    room_id = (data.get("roomId") or "").strip()
+    lecturer_name = (data.get("lecturer") or "").strip()
+    module = (data.get("module") or "").strip()
 
-# NOTE:
-# No lecture data is written to the lecture container
-# All booking data will be stored on lecturer records
+    if not room_id:
+        return json_resp({"result": False, "msg": "roomId is required"}, status=400)
+    if not lecturer_name:
+        return json_resp({"result": False, "msg": "lecturer is required"}, status=400)
+    if not module:
+        return json_resp ({"result": False, "msg": "module is required"}, status=400)
+    
+    LecturerContainter=get_lecturer_container()
+    RoomContainer = get_lecture_container()
+
+    #Simple query if the lecture exists
+    lecturers=list(LecturerContainter.query_items(
+        query="SELECT * FROM l WHERE l.name =@name",
+        parameters=({"name": "@name", "value": lecturer_name}),
+        enable_cross_partition_query=True
+    ))
+
+    if not lecturers:
+        return json_resp({"result": False, "msg": "lecturer not found"}, status=404)
+    
+    lecturer = lecturers[0]
+    if module not in lecturer.get("modules", []):
+        return json_resp(
+            {"result": False, "msg": "lecturer does not teach this module", "allowed": lecturer.get("modules", [])},
+            status=400
+        )
+    
+    # Query to Get room docs or create if missing
+    room_docs = list(RoomContainer.query_items(
+        query="SELECT * FROM r WHERE r.roomId = @rid OR r.id = @rid",
+        parameters=[{"name": "@rid", "value": room_id}],
+        enable_cross_partition_query=True
+    ))
+    if room_docs:
+        room = room_docs[0]
+    else:
+        room = {"id": room_id, "roomId": room_id, "status": "empty", "module": None, "lecturer": None, "startedAt": None}
+        RoomContainer.create_item(body=room)
+        room = list(RoomContainer.query_items(
+            query="SELECT * FROM r WHERE r.id = @r.id",
+            parameters=[{"name": "@rid", "value": room_id}],
+            enable_cross_partition_query=True
+        ))[0]
+
+@app.route(route="lecture/setLecturer", auth_level=func.AuthLevel.FUNCTION, methods=["POST"])
+def lecture_set_lecturer(req: func.HttpRequest) -> func.HttpResponse:
+    logging.info("lecture/setLecturer")
+
+    data, err = parse_json(req)
+    if err:
+        return err
+    
+    room_id = (data.get("roomId") or "").strip()
+    lecturer_name = (data.get("lecturer") or "").strip()
+    action = (data.get("action") or "").strip().lower()
+
+    if not room_id:
+        return json_resp({"result": False, "msg": "roomId is required"}, status=400)
+    if not lecturer_name:
+        return json_resp({"result": False, "msg": "lecturer is required"}, status=400)
+    if action not in ("start", "end"):
+        return json_resp({"result": False, "msg": "action must be 'start' or 'end'"}, status=400)
+    
+    LecturerContainer = get_lecturer_container()
+    RoomContainer = get_lecture_container()
+
+    # Query to check if the lecture exists
+    lecturers = list(LecturerContainer.query_items(
+        query="SELECT * FROM l WHERE l.name = @name",
+        parameters=[{"name": "@name", "value": lecturer_name}],
+        enable_cross_partition_query=True
+    ))
+
+    if not lecturers:
+        return json_resp({"result": False, "msg": "lecturer not fond"}, status=404)
+    
+    # Query to Get room docs or create if missing
+    room_docs = list(RoomContainer.query_items(
+        query="SELECT * FROM r WHERE r.roomId = @rid OR r.id = @rid",
+        parameters=[{"name": "@rid", "value": room_id}],
+        enable_cross_partition_query=True
+    ))
+    if room_docs:
+        room = room_docs[0]
+    else:
+        room = {"id": room_id, "roomId": room_id, "status": "empty", "module": None, "lecturer": None, "startedAt": None}
+        RoomContainer.create_item(body=room)
+        room = list(RoomContainer.query_items(
+            query="SELECT * FROM r WHERE r.id = @r.id",
+            parameters=[{"name": "@rid", "value": room_id}],
+            enable_cross_partition_query=True
+        ))[0]
+    
+    # Other lecturer cannot take away another lecturers room
+    if action == "start":
+        if room.get("lecturer") and room["lecturer"] != lecturer_name:
+            return json_resp({"result": False, "msg": "room already booked by another lecturer"}, status=409)
+        
+        room["lecturer"] = lecturer_name
+        room["status"] = "booked"
+        room["startedAt"] = datetime.datetime.now(datetime.timezone.utc).isoformat() + "Z"
+        return json_resp({"result": True, "msg": "lecturer set", "room": room}, status=200)
+    
+    #End
+    else:
+        if room.get("lecturer") != lecturer_name:
+            return json_resp({"result": False, "msg": "you can only end your own lecture"}, status=403)
+        
+        room["lecturer"] = None
+        room["status"] = "empty"
+        room["startedAt"] = None
+        RoomContainer.replace_item(item=room["id"], body=room)
+        return json_resp({"result": True, "msg": "lecturer cleared", "room": room}, status=200)
+
+
+# helpers for new lecture APIs
+def clean_unique_modules(mods):
+    if not isinstance(mods, list):
+        return []
+    cleaned = []
+    seen = set()
+    for m in mods:
+        if isinstance(m, str):
+            mm = m.strip()
+            if mm and mm not in seen:
+                seen.add(mm)
+                cleaned.append(mm)
+    return cleaned
+
+def get_or_create_building_doc(building: str):
+    LectureContainer = get_lecture_container()
+    building = (building or "").strip()
+    if not building:
+        return None, json_resp({"result": False, "msg": "building is required"}, status=400)
+
+    existing = list(LectureContainer.query_items(
+        query="SELECT * FROM c WHERE c.id = @id",
+        parameters=[{"name": "@id", "value": building}],
+        enable_cross_partition_query=True
+    ))
+
+    if existing:
+        return existing[0], None
+
+    doc = {
+        "id": building,
+        "building": building,
+        "lecturer": None,
+        "module": None,
+        "students": []
+    }
+    LectureContainer.upsert_item(body=doc)
+    return doc, None
+
+# Student modules: get / replace
+@app.route(route="student/modules/get", auth_level=func.AuthLevel.FUNCTION, methods=["GET"])
+def student_modules_get(req: func.HttpRequest) -> func.HttpResponse:
+    name = (req.params.get("name") or "").strip()
+    if not name:
+        return json_resp({"result": False, "msg": "name is required"}, status=400)
+
+    StudentContainer = get_student_container()
+    students = list(StudentContainer.query_items(
+        query="SELECT * FROM s WHERE s.name = @name",
+        parameters=[{"name": "@name", "value": name}],
+        enable_cross_partition_query=True
+    ))
+    if not students:
+        return json_resp({"result": False, "msg": "student not found"}, status=404)
+
+    s = students[0]
+    return json_resp({"result": True, "modules": s.get("modules", [])}, status=200)
+
+@app.route(route="student/modules/replace", auth_level=func.AuthLevel.FUNCTION, methods=["POST"])
+def student_modules_replace(req: func.HttpRequest) -> func.HttpResponse:
+    data, err = parse_json(req)
+    if err:
+        return err
+
+    name = (data.get("name") or "").strip()
+    modules = clean_unique_modules(data.get("modules") or [])
+
+    if not name:
+        return json_resp({"result": False, "msg": "name is required"}, status=400)
+
+    if len(modules) != 4:
+        return json_resp({"result": False, "msg": "students must have exactly 4 different modules"}, status=400)
+
+    invalid = [m for m in modules if m not in ALLOWED_MODULES]
+    if invalid:
+        return json_resp({"result": False, "msg": "invalid module(s)", "invalid": invalid}, status=400)
+
+    StudentContainer = get_student_container()
+    students = list(StudentContainer.query_items(
+        query="SELECT * FROM s WHERE s.name = @name",
+        parameters=[{"name": "@name", "value": name}],
+        enable_cross_partition_query=True
+    ))
+    if not students:
+        return json_resp({"result": False, "msg": "student not found"}, status=404)
+
+    s = students[0]
+    s["modules"] = modules
+    StudentContainer.replace_item(item=s["id"], body=s)
+
+    return json_resp({"result": True, "msg": "OK", "modules": modules}, status=200)
+
+@app.route(route="lecturer/modules/get", auth_level=func.AuthLevel.FUNCTION, methods=["GET"])
+def lecturer_modules_get(req: func.HttpRequest) -> func.HttpResponse:
+    name = (req.params.get("name") or "").strip()
+    if not name:
+        return json_resp({"result": False, "msg": "name is required"}, status=400)
+
+    LecturerContainer = get_lecturer_container()
+    lecturers = list(LecturerContainer.query_items(
+        query="SELECT * FROM l WHERE l.name = @name",
+        parameters=[{"name": "@name", "value": name}],
+        enable_cross_partition_query=True
+    ))
+    if not lecturers:
+        return json_resp({"result": False, "msg": "lecturer not found"}, status=404)
+
+    l = lecturers[0]
+    return json_resp({"result": True, "modules": l.get("modules", [])}, status=200)
+
+@app.route(route="lecturer/modules/replace", auth_level=func.AuthLevel.FUNCTION, methods=["POST"])
+def lecturer_modules_replace(req: func.HttpRequest) -> func.HttpResponse:
+    data, err = parse_json(req)
+    if err:
+        return err
+
+    name = (data.get("name") or "").strip()
+    modules = clean_unique_modules(data.get("modules") or [])
+
+    if not name:
+        return json_resp({"result": False, "msg": "name is required"}, status=400)
+
+    if len(modules) != 3:
+        return json_resp({"result": False, "msg": "lecturers must have exactly 3 different modules"}, status=400)
+
+    invalid = [m for m in modules if m not in ALLOWED_MODULES]
+    if invalid:
+        return json_resp({"result": False, "msg": "invalid module(s)", "invalid": invalid}, status=400)
+
+    LecturerContainer = get_lecturer_container()
+    lecturers = list(LecturerContainer.query_items(
+        query="SELECT * FROM l WHERE l.name = @name",
+        parameters=[{"name": "@name", "value": name}],
+        enable_cross_partition_query=True
+    ))
+    if not lecturers:
+        return json_resp({"result": False, "msg": "lecturer not found"}, status=404)
+
+    l = lecturers[0]
+    l["modules"] = modules
+    LecturerContainer.replace_item(item=l["id"], body=l)
+
+    return json_resp({"result": True, "msg": "OK", "modules": modules}, status=200)
+
+@app.route(route="lecture/student/add", auth_level=func.AuthLevel.FUNCTION, methods=["POST"])
+def lecture_student_add(req: func.HttpRequest) -> func.HttpResponse:
+    data, err = parse_json(req)
+    if err:
+        return err
+
+    building = (data.get("building") or "").strip()
+    student = (data.get("student") or "").strip()
+
+    if not building or not student:
+        return json_resp({"result": False, "msg": "building and student are required"}, status=400)
+
+    doc, derr = get_or_create_building_doc(building)
+
+    if derr:
+        return derr
+    
+    if not doc.get("lecturer"):
+        return json_resp({"result": False, "msg": "no lecture running in this building"}, status=400)
+
+    students = doc.get("students") or []
+    if student not in students:
+        students.append(student)
+
+    doc["students"] = students
+    get_lecture_container().upsert_item(body=doc)
+
+    return json_resp({"result": True, "msg": "OK", "students": students}, status=200)
+
+@app.route(route="lecture/student/remove", auth_level=func.AuthLevel.FUNCTION, methods=["POST"])
+def lecture_student_remove(req: func.HttpRequest) -> func.HttpResponse:
+    data, err = parse_json(req)
+    if err:
+        return err
+
+    building = (data.get("building") or "").strip()
+    student = (data.get("student") or "").strip()
+
+    if not building or not student:
+        return json_resp({"result": False, "msg": "building and student are required"}, status=400)
+
+    doc, derr = get_or_create_building_doc(building)
+    if derr:
+        return derr
+
+    students = doc.get("students") or []
+    doc["students"] = [s for s in students if s != student]
+
+    get_lecture_container().upsert_item(body=doc)
+
+    return json_resp({"result": True, "msg": "OK", "students": doc["students"]}, status=200)
+
+@app.route(route="lecture/end", auth_level=func.AuthLevel.FUNCTION, methods=["POST"])
+def lecture_end(req: func.HttpRequest) -> func.HttpResponse:
+    data, err = parse_json(req)
+    if err:
+        return err
+
+    building = (data.get("building") or "").strip()
+    if not building:
+        return json_resp({"result": False, "msg": "building is required"}, status=400)
+
+    doc, derr = get_or_create_building_doc(building)
+    if derr:
+        return derr
+
+    # clear everything except building
+    doc["lecturer"] = None
+    doc["module"] = None
+    doc["students"] = []
+
+    get_lecture_container().upsert_item(body=doc)
+
+    return json_resp({"result": True, "msg": "OK", "building": building}, status=200)

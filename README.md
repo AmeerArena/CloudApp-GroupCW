@@ -1,16 +1,5 @@
-# Coursework template
+# Coursework template - Sophie's Version
 
-This is the template that you can use for your coursework 1 part 2.
+Changes made include the addition of the 'lectureSetup.ejs' file and changes to 'app.js', 'client.js', and 'client.ejs'.
 
-It is a simple chat application written in Javascript, using the Express server framework, VueJS and Socket.IO.
-
-## Running
-
-### Locally
-
-Start the application using:
-```
-$ npm start
-```
-
-### Deploying to the cloud
+Please check my work because idk if it's running as it should...

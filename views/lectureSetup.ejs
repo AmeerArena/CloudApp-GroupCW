@@ -1,0 +1,42 @@
+<div class="w-full max-w-md mx-auto text-center mt-5">
+    <div class="mb-4">
+        <h3 class="mb-2">Set Up Lecture</h3>
+
+        <input
+            type="text"
+            v-model="roomId"
+            placeholder="Room ID"
+            class="form-control mb-3"
+        >
+
+        <select v-model="selectedModule" class="form-control mb-3">
+            <option disabled value="">Select a Module</option>
+            <option v-for="mod in me.modules" :value="mod" :key="mod">
+                {{ mod }}
+            </option>
+        </select>
+
+        <button
+            class="btn btn-success me-2"
+            @click="setupLecture"
+            :disabled="!roomId || !selectedModule"
+        >
+            Set Up Lecture
+        </button>
+
+        <p v-if="setupError" class="text-danger mt-3">
+            {{ setupError }}
+        </p>
+    </div>
+
+    <div class="mt-4">
+        <button
+            class="btn btn-secondary"
+            @click="goToMain"
+        >
+            Back
+        </button>
+    </div>
+</div>
+
+// y'all idk...

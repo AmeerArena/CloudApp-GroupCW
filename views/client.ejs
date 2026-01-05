@@ -23,9 +23,14 @@
     
         <!-- APP -->
         <div v-else>
-            <div v-if="connected"></div>
-            <div v-else>
-                <p>Connecting...</p>
+            <div v-if="page === 'main'">
+                <h3>Welcome, {{ me && me.name ? me.name : 'Lecturer' }}!</h3>
+                <button @click="page = 'lectureSetup'" class="btn btn-primary">Set Up Lecture</button>
+                <button @click="logout" class="btn btn-secondary ms-2">Logout</button>
+            </div>
+            
+            <div v-if="page === 'lectureSetup'">
+                <%- include('lectureSetup'); -%>
             </div>
         </div>
     

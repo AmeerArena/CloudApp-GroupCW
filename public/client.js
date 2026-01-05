@@ -30,7 +30,12 @@ var app = new Vue({
             "COMP1","COMP2","COMP3",
             "ELEC1","ELEC2","ELEC3",
             "MATH1","MATH2","MATH3"
-        ]
+        ],
+
+        // lecture setup
+        roomId: '',
+        selectedModule: '',
+        setupError: '',
     },
     mounted() {
         connect();
@@ -100,6 +105,46 @@ var app = new Vue({
                 password: this.lecturerRegisterPassword,
                 modules
             });
+        },
+
+        setupLecture() {
+            this.setupError = '';
+            if (!socket || !this.connected) {
+                this.setupError = 'Not connected to server';
+                return;
+            }
+            socket.emit('lecture:setup', {
+                title: this.roomId,
+                module: this.selectedModule
+            });
+        },
+
+        // someone please check this!! I made this to be the main page after logging in (home page?)
+        goToMain() {
+            this.page = 'main';
+            this.roomId = '';
+            this.selectedModule = '';
+            this.setupError = '';
+        },
+
+        // idk...
+        logout() {
+            this.me = null;
+            this.page = 'login';
+            this.loginName = '';
+            this.loginPassword = '';
+            this.loginError = '';
+            this.registerName = '';
+            this.registerPassword = '';
+            this.registerModules = ['', '', '', ''];
+            this.registerError = '';
+            this.lecturerRegisterName = '';
+            this.lecturerRegisterPassword = '';
+            this.lecturerRegisterModules = ['', '', ''];
+            this.lecturerRegisterError = '';
+            this.roomId = '';
+            this.selectedModule = '';
+            this.setupError = '';
         }
     }
 });
@@ -158,10 +203,19 @@ function connect() {
         app.lecturerRegisterModules = ['', '', ''];
     });
 
+    // Lecture setup
+    socket.on('lecture:setup:result', (data) => {
+        console.log('Lecture setup result:', data);
+        app.page = 'main';
+    });
+
+    socket.on('lecture:setup:error', (msg) => {
+        app.setupError = msg;
+    });
+
     socket.on('disconnect', function () {
         console.log('Socket disconnected');
         app.connected = false;
         socket = null;
     });
 }
-

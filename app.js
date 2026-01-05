@@ -123,6 +123,41 @@ async function lecturerHire(name, password, modules) {
     }
 }
 
+// for lecture setup!
+async function lectureSetup(lecturerId, roomId, module) {
+    try {
+        const moduleResponse = await fetch(`${BACKEND_ENDPOINT}/lecture/setModule?code=${FUNCTION_KEY}`, 
+            {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ roomId, lecturer: lecturerId, module })
+            });
+
+        const moduleData = await moduleResponse.json();
+        if (!moduleData.result) {
+            return { error: moduleData.msg || "Set module failed" };
+        }
+
+        const lecturerResponse = await fetch(`${BACKEND_ENDPOINT}/lecture/setLecturer?code=${FUNCTION_KEY}`, 
+            {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ roomId, lecturer: lecturerId, action: "start" })
+            });
+
+        const lecturerData = await lecturerResponse.json();
+        if (!lecturerData.result) {
+            return { error: lecturerData.msg || "Set lecturer failed" };
+        }
+
+        return lecturerData;
+
+    } catch (err) {
+        console.error("Lecture setup API ERROR:", err);
+        return { error: "API_ERROR" };
+    }
+}
+
 
 // Socket.io
 io.on('connection', socket => {
@@ -170,6 +205,7 @@ io.on('connection', socket => {
             return;
         }
 
+        socket.lecturerId = result.lecturer.id;
         socket.emit('lecturer:login:result', result);
         console.log('Lecturer logged in:', result);
     });
@@ -188,6 +224,23 @@ io.on('connection', socket => {
         socket.emit('lecturer:register:result', result);
     });
 
+    // Lecture Setup (please check this!!)
+    socket.on('lecture:setup', async (data) => {
+        const { roomId, module } = data;
+        const lecturerId = socket.lecturerId;
+        const result = await lectureSetup(lecturerId, roomId, module);
+
+        if (result.error) {
+            socket.emit('lecture:setup:error', result.error);
+            return;
+        }
+
+        socket.emit('lecture:setup:result', result);
+
+        // idk about this one...
+        // console.log('Lecture setup successfully or something:', result);
+    });
+
     socket.on('disconnect', () => console.log('Dropped connection'));
 });
 
@@ -195,7 +248,7 @@ io.on('connection', socket => {
 // Start server
 const PORT = process.env.PORT || 8080;
 server.listen(PORT, () => {
-  console.log(`Server listening on port ${PORT}`);
+    console.log(`Server listening on port ${PORT}`);
 });
 
 module.exports = server;
