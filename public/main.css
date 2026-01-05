@@ -25,6 +25,87 @@ body {
 #chat li { 
     padding: 5px 10px; 
 }
-#chat li:nth-child(odd) { 
-    background-color: rgba(0,0,0,0.2); 
+#chat li:nth-child(odd) {
+    background-color: rgba(0,0,0,0.2);
+}
+
+/* In-Lecture Page Styles */
+.in-lecture-container {
+    padding: 20px;
+}
+
+.board-container {
+    min-height: 400px;
+    max-height: calc(100vh - 200px);
+}
+
+.board-content {
+    font-family: 'Courier New', monospace;
+    font-size: 16px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.chat-messages {
+    background-color: #f8f9fa;
+}
+
+.chat-messages > div {
+    padding: 8px;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.chat-messages > div:last-child {
+    border-bottom: none;
+}
+
+.chat-header {
+    border-radius: 0.25rem 0.25rem 0 0;
+}
+
+/* Homepage Building Grid Styles */
+.homepage-container {
+    padding: 20px;
+}
+
+.building-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+    gap: 15px;
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+    border: 2px solid #000;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+}
+
+.building-box {
+    background-color: white;
+    border: 2px solid #dee2e6;
+    border-radius: 4px;
+    padding: 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    min-height: 100px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 500;
+}
+
+.building-box:hover {
+    background-color: #e9ecef;
+    border-color: #007bff;
+    transform: scale(1.05);
+}
+
+.building-box.selected {
+    background-color: #007bff;
+    color: white;
+    border-color: #0056b3;
+    box-shadow: 0 4px 8px rgba(0, 123, 255, 0.3);
 }

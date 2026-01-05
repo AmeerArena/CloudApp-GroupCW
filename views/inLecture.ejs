@@ -1,0 +1,76 @@
+<div class="in-lecture-container">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4>{{ currentLectureTitle || 'Lecture' }}</h4>
+        <button class="btn btn-secondary btn-sm" @click="exitLecture">
+            Exit Lecture
+        </button>
+    </div>
+
+    <div class="row" style="height: calc(100vh - 200px);">
+        <!-- Main Board Area -->
+        <div class="col-md-8 d-flex flex-column">
+            <div class="board-container border rounded p-3 bg-white" style="flex: 1; overflow-y: auto;">
+                <div 
+                    v-if="isLecturer"
+                    ref="lecturerBoard"
+                    contenteditable="true"
+                    @input="updateBoard"
+                    class="board-content"
+                    style="min-height: 100%; outline: none; white-space: pre-wrap;"
+                ></div>
+                <div 
+                    v-else
+                    class="board-content"
+                    style="min-height: 100%; white-space: pre-wrap;"
+                    v-html="boardContent"
+                ></div>
+            </div>
+        </div>
+
+        <!-- Chat Sidebar -->
+        <div class="col-md-4 d-flex flex-column border rounded bg-light">
+            <div class="chat-header p-2 border-bottom bg-primary text-white">
+                <h5 class="mb-0">Chat</h5>
+            </div>
+            
+            <div 
+                id="chat-messages" 
+                class="chat-messages p-2 flex-grow-1"
+                style="overflow-y: auto; max-height: calc(100vh - 300px);"
+            >
+                <div 
+                    v-for="(msg, index) in chatMessages" 
+                    :key="index"
+                    class="mb-2"
+                >
+                    <div class="d-flex">
+                        <strong class="me-2">{{ msg.user }}:</strong>
+                        <span>{{ msg.message }}</span>
+                    </div>
+                    <small class="text-muted">{{ msg.time }}</small>
+                </div>
+            </div>
+
+            <div class="chat-input p-2 border-top">
+                <div class="input-group">
+                    <input
+                        type="text"
+                        v-model="chatInput"
+                        @keyup.enter="sendMessage"
+                        placeholder="Type a message..."
+                        class="form-control"
+                    >
+                    <button 
+                        class="btn btn-primary" 
+                        @click="sendMessage"
+                        :disabled="!chatInput.trim()"
+                    >
+                        Send
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+

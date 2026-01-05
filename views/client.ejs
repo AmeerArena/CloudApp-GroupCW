@@ -23,7 +23,57 @@
     
         <!-- APP -->
         <div v-else>
-            <div v-if="connected"></div>
+            <div v-if="connected">
+                <!-- Lecturer Views -->
+                <div v-if="isLecturer">
+                    <div v-if="page === 'homepage'">
+                        <%- include('homepage'); -%>
+                    </div>
+                    <div v-else-if="page === 'lectureSetup'">
+                        <%- include('lectureSetup'); -%>
+                    </div>
+                    <div v-else-if="page === 'inLecture'">
+                        <%- include('inLecture'); -%>
+                    </div>
+                    <div v-else-if="page === 'settings'">
+                        <%- include('settings'); -%>
+                    </div>
+                    <div v-else>
+                        <div class="text-center mt-5">
+                            <h3>Lecturer Dashboard</h3>
+                            <button class="btn btn-primary mt-3 me-2" @click="page = 'homepage'">
+                                Select Building
+                            </button>
+                            <button class="btn btn-secondary mt-3" @click="goToSettings">
+                                Settings
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <!-- Student Views -->
+                <div v-else>
+                    <div v-if="page === 'homepage'">
+                        <%- include('homepage'); -%>
+                    </div>
+                    <div v-else-if="page === 'inLecture'">
+                        <%- include('inLecture'); -%>
+                    </div>
+                    <div v-else-if="page === 'settings'">
+                        <%- include('settings'); -%>
+                    </div>
+                    <div v-else>
+                        <div class="text-center mt-5">
+                            <h3>Student Dashboard</h3>
+                            <button class="btn btn-primary mt-3 me-2" @click="page = 'homepage'">
+                                Select Building
+                            </button>
+                            <button class="btn btn-secondary mt-3" @click="goToSettings">
+                                Settings
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
             <div v-else>
                 <p>Connecting...</p>
             </div>
