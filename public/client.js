@@ -11,6 +11,11 @@ var app = new Vue({
         loginPassword: '',
         loginError: '',
 
+        // student or lecturer
+        role: null,               
+        selectedBuilding: null,
+        buildings: Array.from({ length: 12 }, (_, i) => `Building-${String(i + 1).padStart(2, "0")}`),
+
         // page state
         page: 'login',
 
@@ -100,7 +105,18 @@ var app = new Vue({
                 password: this.lecturerRegisterPassword,
                 modules
             });
-        }
+        },
+
+        startLecture(building) {
+            this.selectedBuilding = building;
+            alert(`Lecturer starting lecture in ${building}`);
+        },
+
+        attendLecture(building) {
+            this.selectedBuilding = building;
+            alert(`Student attending lecture in ${building}`);
+        },
+
     }
 });
 
@@ -119,20 +135,32 @@ function connect() {
         app.loginError = msg;
     });
 
-    socket.on('student:login:result', (data) => {
-        console.log('LOGIN RESULT:', data);
+    socket.on("student:login:result", (data) => {
+        if (data.result === false) {
+            app.loginError = data.msg || "Login failed";
+            return;
+        }
         app.me = data.student || data;
-    });
+        app.role = "student";
+        app.page = "home";
+        app.loginError = null;
+        });
 
     // Login lecturer
     socket.on('lecturer:login:error', (msg) => {
         app.loginError = msg;
     });
 
-    socket.on('lecturer:login:result', (data) => {
-        console.log('LECTURER LOGIN RESULT:', data);
+    socket.on("lecturer:login:result", (data) => {
+        if (data.result === false) {
+            app.loginError = data.msg || "Login failed";
+            return;
+        }
         app.me = data.lecturer || data;
-    });
+        app.role = "lecturer";
+        app.page = "home";
+        app.loginError = null;
+        });
 
     // Register student
     socket.on('register:error', (msg) => {

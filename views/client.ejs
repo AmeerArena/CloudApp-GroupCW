@@ -23,11 +23,40 @@
     
         <!-- APP -->
         <div v-else>
-            <div v-if="connected"></div>
-            <div v-else>
-                <p>Connecting...</p>
+        <div v-if="connected">
+
+            <!-- HOME PAGE -->
+            <div v-if="page === 'home'">
+            <h4 class="text-center mt-3">Choose a building</h4>
+
+            <div class="row mt-4">
+                <div class="col-3 mb-3" v-for="b in buildings" :key="b">
+                <div class="card p-2 text-center">
+                    <strong>{{ b }}</strong>
+
+                    <div class="mt-2" v-if="role === 'lecturer'">
+                    <button class="btn btn-sm btn-primary" @click="startLecture(b)">
+                        Start lecture
+                    </button>
+                    </div>
+
+                    <div class="mt-2" v-if="role === 'student'">
+                    <button class="btn btn-sm btn-success" @click="attendLecture(b)">
+                        Attend lecture
+                    </button>
+                    </div>
+                </div>
+                </div>
             </div>
+            </div>
+
         </div>
+
+        <div v-else>
+            <p>Connecting...</p>
+        </div>
+        </div>
+
     
     </div>
 
