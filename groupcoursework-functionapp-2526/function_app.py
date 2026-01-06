@@ -531,7 +531,7 @@ def lecture_set_module(req: func.HttpRequest) -> func.HttpResponse:
     #Simple query if the lecture exists
     lecturers=list(LecturerContainter.query_items(
         query="SELECT * FROM l WHERE l.name =@name",
-        parameters=({"name": "@name", "value": lecturer_name}),
+        parameters=[{"name": "@name", "value": lecturer_name}],
         enable_cross_partition_query=True
     ))
 
@@ -557,10 +557,17 @@ def lecture_set_module(req: func.HttpRequest) -> func.HttpResponse:
         room = {"id": room_id, "roomId": room_id, "status": "empty", "module": None, "lecturer": None, "startedAt": None}
         RoomContainer.create_item(body=room)
         room = list(RoomContainer.query_items(
-            query="SELECT * FROM r WHERE r.id = @r.id",
+            query="SELECT * FROM r WHERE r.id = @rid",
             parameters=[{"name": "@rid", "value": room_id}],
             enable_cross_partition_query=True
         ))[0]
+    room["module"] = module
+
+    RoomContainer.replace_item(item=room["id"], body=room)
+    return json_resp(
+        {"result": True, "msg": "module set", "room": room},
+        status=200
+    )
 
 @app.route(route="lecture/setLecturer", auth_level=func.AuthLevel.FUNCTION, methods=["POST"])
 def lecture_set_lecturer(req: func.HttpRequest) -> func.HttpResponse:
@@ -606,10 +613,11 @@ def lecture_set_lecturer(req: func.HttpRequest) -> func.HttpResponse:
         room = {"id": room_id, "roomId": room_id, "status": "empty", "module": None, "lecturer": None, "startedAt": None}
         RoomContainer.create_item(body=room)
         room = list(RoomContainer.query_items(
-            query="SELECT * FROM r WHERE r.id = @r.id",
+            query="SELECT * FROM r WHERE r.id = @rid",
             parameters=[{"name": "@rid", "value": room_id}],
             enable_cross_partition_query=True
         ))[0]
+    
     
     # Other lecturer cannot take away another lecturers room
     if action == "start":
@@ -619,6 +627,7 @@ def lecture_set_lecturer(req: func.HttpRequest) -> func.HttpResponse:
         room["lecturer"] = lecturer_name
         room["status"] = "booked"
         room["startedAt"] = datetime.datetime.now(datetime.timezone.utc).isoformat() + "Z"
+        RoomContainer.replace_item(item=room["id"], body=room)
         return json_resp({"result": True, "msg": "lecturer set", "room": room}, status=200)
     
     #End
