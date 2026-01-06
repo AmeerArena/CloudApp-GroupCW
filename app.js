@@ -289,7 +289,7 @@ io.on('connection', socket => {
             };
         }
 
-        // Broadcast that a lecture has started in this building
+        // Broadcast lecture start to all clients so students can see available lectures
         if (building) {
             io.emit('lecture:building:update', {
                 building: building,

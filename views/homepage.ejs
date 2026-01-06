@@ -14,9 +14,9 @@
         </div>
     </div>
 
-    <!-- Action Buttons -->
+    <!-- Action Buttons: role-based actions after building selection -->
     <div class="d-flex justify-content-center gap-3">
-        <!-- Start Lecture Button (Lecturers only, after selecting building) -->
+        <!-- Lecturers: start lecture in selected building -->
         <button
             v-if="isLecturer && selectedBuilding"
             class="btn btn-primary btn-lg"
@@ -25,7 +25,7 @@
             Start Lecture
         </button>
 
-        <!-- Attend Lecture Button (Students only, after selecting building with lecture) -->
+        <!-- Students: attend lecture if building has active lecture -->
         <button
             v-if="!isLecturer && selectedBuilding && hasLectureInBuilding(selectedBuilding)"
             class="btn btn-success btn-lg"

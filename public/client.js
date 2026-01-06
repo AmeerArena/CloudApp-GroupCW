@@ -26,13 +26,13 @@ var app = new Vue({
         lecturerRegisterModules: ['', '', ''],
         lecturerRegisterError: '',
 
-        // homepage/building selection
-        selectedBuilding: null,
-        buildingLectures: {}, // Map of building number to lecture data
-        showStartLectureModal: false,
-        quickLectureTitle: '',
-        quickSelectedModule: '',
-        quickLectureError: '',
+        // Homepage: building selection and quick lecture start
+        selectedBuilding: null, // Currently selected building number
+        buildingLectures: {}, // Tracks which buildings have active lectures
+        showStartLectureModal: false, // Controls modal visibility for quick start - a litte pop-up window that shows up
+        quickLectureTitle: '', // Lecture title from homepage modal
+        quickSelectedModule: '', // Module selection from homepage modal
+        quickLectureError: '', // Error messages for homepage lecture start
 
         // lecture setup
         lectureTitle: '',
@@ -147,8 +147,8 @@ var app = new Vue({
         },
 
         selectBuilding(buildingNumber) {
+            // Select a building and close any open modals
             this.selectedBuilding = buildingNumber;
-            // Close modal if open
             this.showStartLectureModal = false;
         },
 
@@ -164,6 +164,7 @@ var app = new Vue({
         },
 
         startLectureFromHomepage() {
+            // Start lecture directly from homepage modal (quick start)
             this.quickLectureError = '';
 
             if (!this.quickLectureTitle || !this.quickSelectedModule) {
@@ -181,11 +182,9 @@ var app = new Vue({
                 return;
             }
 
-            // Store lecture title for in-lecture page
+            // Store lecture details and emit to server
             this.currentLectureTitle = this.quickLectureTitle;
             this.selectedModule = this.quickSelectedModule;
-
-            // Emit event to start lecture with building info
             socket.emit('lecture:start', {
                 title: this.quickLectureTitle,
                 module: this.quickSelectedModule,
@@ -193,27 +192,25 @@ var app = new Vue({
                 building: this.selectedBuilding
             });
 
-            // Close modal
+            // Close modal and clear form
             this.showStartLectureModal = false;
-            // Clear form
             this.quickLectureTitle = '';
             this.quickSelectedModule = '';
         },
 
         hasLectureInBuilding(buildingNumber) {
-            // Check if there's an active lecture in this building
+            // Check if building has an active lecture
             return this.buildingLectures[buildingNumber] !== undefined;
         },
 
         attendLecture() {
+            // Student joins lecture in selected building
             if (!this.selectedBuilding || !this.hasLectureInBuilding(this.selectedBuilding)) {
                 return;
             }
-            // Get lecture data for this building
             const lecture = this.buildingLectures[this.selectedBuilding];
             this.currentLectureTitle = lecture.title || `Lecture in Building ${this.selectedBuilding}`;
             this.page = 'inLecture';
-            // Join lecture room
             if (socket) {
                 socket.emit('lecture:join', { lectureTitle: this.currentLectureTitle });
             }
@@ -238,6 +235,7 @@ var app = new Vue({
         },
 
         startLecture() {
+            // Start lecture from lecture setup page (includes building info)
             this.lectureError = '';
 
             if (!this.lectureTitle || !this.selectedModule) {
@@ -255,10 +253,7 @@ var app = new Vue({
                 return;
             }
 
-            // Store lecture title for in-lecture page
             this.currentLectureTitle = this.lectureTitle;
-
-            // Emit event to start lecture with building info
             socket.emit('lecture:start', {
                 title: this.lectureTitle,
                 module: this.selectedModule,
@@ -386,13 +381,12 @@ function connect() {
     });
 
     socket.on('student:login:result', (data) => {
+        // Student login: navigate to homepage for building selection
         console.log('LOGIN RESULT:', data);
         app.me = data.student || data;
-        app.userType = 'student'; // Mark as student
-        // Navigate to homepage to select building
+        app.userType = 'student';
         app.page = 'homepage';
         app.selectedBuilding = null;
-        // Store user name for chat
         if (socket) {
             socket.userName = app.me.name;
         }
@@ -404,13 +398,12 @@ function connect() {
     });
 
     socket.on('lecturer:login:result', (data) => {
+        // Lecturer login: navigate to homepage for building selection
         console.log('LECTURER LOGIN RESULT:', data);
         app.me = data.lecturer || data;
-        app.userType = 'lecturer'; // Mark as lecturer
-        // Navigate to homepage to select building
+        app.userType = 'lecturer';
         app.page = 'homepage';
         app.selectedBuilding = null;
-        // Store user name for chat
         if (socket) {
             socket.userName = app.me.name;
         }
@@ -440,19 +433,19 @@ function connect() {
         app.lecturerRegisterModules = ['', '', ''];
     });
 
-    // Lecture start
+    // Lecture start result: store building lecture and navigate to in-lecture page
     socket.on('lecture:start:result', (data) => {
         console.log('LECTURE START RESULT:', data);
         if (data.error) {
-            // Show error in appropriate place
+            // Show error in modal (homepage) or form (setup page)
             if (app.page === 'homepage') {
                 app.quickLectureError = data.error;
-                app.showStartLectureModal = true; // Reopen modal to show error
+                app.showStartLectureModal = true;
             } else {
                 app.lectureError = data.error;
             }
         } else {
-            // Store lecture in building
+            // Store lecture in building and join lecture room
             if (app.selectedBuilding) {
                 app.buildingLectures[app.selectedBuilding] = {
                     title: app.currentLectureTitle,
@@ -460,15 +453,13 @@ function connect() {
                     lecturer: app.me.name
                 };
             }
-            // Navigate to in-lecture page
             app.page = 'inLecture';
             app.boardContent = '';
             app.chatMessages = [];
-            // Join lecture room
             if (socket) {
                 socket.emit('lecture:join', { lectureTitle: app.currentLectureTitle });
             }
-            // Initialize board content for lecturer after Vue renders
+            // Initialise board for lecturer
             app.$nextTick(() => {
                 if (app.isLecturer && app.$refs.lecturerBoard && app.boardContent) {
                     app.$refs.lecturerBoard.innerHTML = app.boardContent;
@@ -481,7 +472,7 @@ function connect() {
         app.lectureError = msg;
     });
 
-    // Building lecture updates (when lectures start/end)
+    // Building lecture updates: receive broadcast when lectures start/end in buildings
     socket.on('lecture:building:update', (data) => {
         if (data.building && data.lecture) {
             app.buildingLectures[data.building] = data.lecture;
