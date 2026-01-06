@@ -691,6 +691,7 @@ def student_modules_get(req: func.HttpRequest) -> func.HttpResponse:
     s = students[0]
     return json_resp({"result": True, "modules": s.get("modules", [])}, status=200)
 
+
 @app.route(route="student/modules/replace", auth_level=func.AuthLevel.FUNCTION, methods=["POST"])
 def student_modules_replace(req: func.HttpRequest) -> func.HttpResponse:
     data, err = parse_json(req)
@@ -725,6 +726,8 @@ def student_modules_replace(req: func.HttpRequest) -> func.HttpResponse:
 
     return json_resp({"result": True, "msg": "OK", "modules": modules}, status=200)
 
+
+
 @app.route(route="lecturer/modules/get", auth_level=func.AuthLevel.FUNCTION, methods=["GET"])
 def lecturer_modules_get(req: func.HttpRequest) -> func.HttpResponse:
     name = (req.params.get("name") or "").strip()
@@ -742,6 +745,7 @@ def lecturer_modules_get(req: func.HttpRequest) -> func.HttpResponse:
 
     l = lecturers[0]
     return json_resp({"result": True, "modules": l.get("modules", [])}, status=200)
+
 
 @app.route(route="lecturer/modules/replace", auth_level=func.AuthLevel.FUNCTION, methods=["POST"])
 def lecturer_modules_replace(req: func.HttpRequest) -> func.HttpResponse:
@@ -776,6 +780,7 @@ def lecturer_modules_replace(req: func.HttpRequest) -> func.HttpResponse:
     LecturerContainer.replace_item(item=l["id"], body=l)
 
     return json_resp({"result": True, "msg": "OK", "modules": modules}, status=200)
+
 
 @app.route(route="lecture/student/add", auth_level=func.AuthLevel.FUNCTION, methods=["POST"])
 def lecture_student_add(req: func.HttpRequest) -> func.HttpResponse:
@@ -828,6 +833,7 @@ def lecture_student_remove(req: func.HttpRequest) -> func.HttpResponse:
     get_lecture_container().upsert_item(body=doc)
 
     return json_resp({"result": True, "msg": "OK", "students": doc["students"]}, status=200)
+
 
 @app.route(route="lecture/end", auth_level=func.AuthLevel.FUNCTION, methods=["POST"])
 def lecture_end(req: func.HttpRequest) -> func.HttpResponse:
