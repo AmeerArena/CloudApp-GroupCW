@@ -15,6 +15,8 @@ const io = require('socket.io')(server);
 app.set('view engine', 'ejs');
 app.use('/static', express.static('public'));
 
+const lectureParticipants = {};
+
 //Handle client interface on /
 app.get('/', (req, res) => {
     res.render('client');
@@ -306,7 +308,7 @@ io.on('connection', socket => {
 
     // Join Lecture
     socket.on('lecture:join', (data) => {
-        const { lectureTitle } = data;
+        const { lectureTitle, userType } = data;
         currentLecture = lectureTitle;
 
         // Initialise if not exists
@@ -316,6 +318,24 @@ io.on('connection', socket => {
                 chatMessages: []
             };
         }
+        
+        if (!lectureParticipants[lectureTitle]) {
+            lectureParticipants[lectureTitle] = {};
+        }
+
+        lectureParticipants[lectureTitle][socket.id] = {
+            userType: userType || "student",
+            userName: socket.userName || "Anonymous"
+        };
+
+        const participants = Object.values(lectureParticipants[lectureTitle]);
+        const studentCount = participants.filter(p => p.userType !== "lecturer").length;
+
+        // Notify all clients about updated participant list
+        io.emit('lecture:count:update', {
+            lectureTitle,
+            studentCount
+        });
 
         // Send current board content and chat messages to the user
         socket.emit('board:update', {
@@ -393,9 +413,23 @@ io.on('connection', socket => {
     });
 
     socket.on('disconnect', () => {
-        console.log('Dropped connection');
-        currentLecture = null;
+    console.log('Dropped connection');
+
+    if (currentLecture && lectureParticipants[currentLecture]) {
+        delete lectureParticipants[currentLecture][socket.id];
+
+        const participants = Object.values(lectureParticipants[currentLecture]);
+        const studentCount = participants.filter(p => p.userType !== "lecturer").length;
+
+        io.emit('lecture:count:update', {
+            lectureTitle: currentLecture,
+            studentCount
+        });
+    }
+
+    currentLecture = null;
     });
+
 });
 
 

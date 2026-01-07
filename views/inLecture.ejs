@@ -1,7 +1,17 @@
 <div class="in-lecture-container">
     <!-- Header -->
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <h4>{{ currentLectureTitle || 'Lecture' }}</h4>
+       <div
+        <h4>
+            {{ currentLectureTitle || 'Lecture' }}
+            <small class="text-muted" v-if="currentLectureModule">
+                — {{ currentLectureModule }}
+            </small>
+       </h4>
+       <div class="text-muted">
+            Students present: <strong>{{ studentCount }}</strong></div>
+    </div>
+
         <button class="btn btn-secondary btn-sm" @click="exitLecture">
             Exit Lecture
         </button>
@@ -34,7 +44,7 @@
                 <h5 class="mb-0">Chat</h5>
             </div>
             
-            <div 
+            <div> 
                 id="chat-messages" 
                 class="chat-messages p-2 flex-grow-1"
                 style="overflow-y: auto; max-height: calc(100vh - 300px);"
