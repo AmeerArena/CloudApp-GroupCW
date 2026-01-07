@@ -260,7 +260,7 @@ var app = new Vue({
 
             this.currentLectureTitle = this.lectureTitle;
             socket.emit('lecture:start', {
-                title: this.lectureTitle,
+                roomId: this.lectureTitle,
                 module: this.selectedModule,
                 lecturer: this.me.name,
                 building: this.selectedBuilding
