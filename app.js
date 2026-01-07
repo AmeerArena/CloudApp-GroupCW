@@ -196,6 +196,39 @@ async function updateUserModules(userId, modules, isLecturer) {
     }
 }
 
+async function setLectureLecturer(id, lecturer) {
+    try {
+        const now = new Date();
+        const date = now.toISOString().split('T')[0]; // YYYY-MM-DD
+        const time = now.toTimeString().split(' ')[0].substring(0, 5); // HH:MM
+
+        const response = await fetch(
+            `${BACKEND_ENDPOINT}/lecture/setLecturer?code=${FUNCTION_KEY}`,
+            {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    id: String(id),
+                    lecturer: lecturer,
+                    date: date,
+                    time: time
+                })
+            }
+        );
+
+        const data = await response.json();
+
+        if (!data.result) {
+            return { error: data.msg || "Failed to set lecturer" };
+        }
+
+        return data;
+    } catch (err) {
+        console.error("Set lecturer API ERROR:", err);
+        return { error: "API_ERROR" };
+    }
+}
+
 
 // Store lecture data (board content and chat messages)
 const lectureData = {};
@@ -274,21 +307,30 @@ io.on('connection', socket => {
     // Start Lecture
     socket.on('lecture:start', async (data) => {
         const { title, module, lecturer, building } = data;
+        const lectureId = String(building);
 
-        const result = await createLecture(title, module, lecturer, building);
-
+        const result = await setLectureLecturer(lectureId, lecturer);
         if (result.error) {
             socket.emit('lecture:start:error', result.error);
             return;
         }
 
         // Initialise lecture data if not exists
-        if (!lectureData[title]) {
-            lectureData[title] = {
-                boardContent: '',
-                chatMessages: [],
-                building: building || null
+        if (!lectureData[lectureId]) {
+        lectureData[lectureId] = {
+            boardContent: '',
+            chatMessages: [],
+            building: building || null,
+            title: title || '',
+            module: module || '',
+            lecturer: lecturer || ''
             };
+        } else {
+        // update metadata if lecture already existed
+        lectureData[lectureId].building = building || lectureData[lectureId].building;
+        lectureData[lectureId].title = title || lectureData[lectureId].title;
+        lectureData[lectureId].module = module || lectureData[lectureId].module;
+        lectureData[lectureId].lecturer = lecturer || lectureData[lectureId].lecturer;
         }
 
         // Broadcast lecture start to all clients so students can see available lectures
@@ -298,12 +340,13 @@ io.on('connection', socket => {
                 lecture: {
                     title: title,
                     module: module,
-                    lecturer: lecturer
+                    lecturer: lecturer,
+                    id: lectureId  
                 }
             });
         }
 
-        socket.emit('lecture:start:result', { success: true, lecture: result });
+        socket.emit('lecture:start:result', { success: true, lecture: {id:lectureId }});
     });
 
     // Join Lecture
