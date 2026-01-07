@@ -1,4 +1,4 @@
-# Coursework template - Sophie's Version
+# COMP3207 Group Coursework - Sophie's Version
 
 Changes made include the addition of the 'lectureSetup.ejs' file and changes to 'app.js', 'client.js', and 'client.ejs'.
 
