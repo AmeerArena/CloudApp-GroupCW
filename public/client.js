@@ -44,6 +44,9 @@ var app = new Vue({
         selectedModule: '',
         lectureError: '',
 
+        studentCount: 0,
+        currentLectureModule: '',
+
         // in-lecture page
         currentLectureTitle: '',
         boardContent: '',
@@ -215,9 +218,10 @@ var app = new Vue({
             }
             const lecture = this.buildingLectures[this.selectedBuilding];
             this.currentLectureTitle = lecture.title || `Lecture in Building ${this.selectedBuilding}`;
+            this.currentLectureModule = lecture.module || '';
             this.page = 'inLecture';
             if (socket) {
-                socket.emit('lecture:join', { lectureTitle: this.currentLectureTitle });
+                socket.emit('lecture:join', { lectureTitle: this.currentLectureTitle, userType: this.userType });
             }
         },
 
@@ -472,11 +476,15 @@ function connect() {
                     lecturer: app.me.name
                 };
             }
+
+            app.currentLectureModule = app.selectedModule || '';
+            app.studentCount = 0;
+
             app.page = 'inLecture';
             app.boardContent = '';
             app.chatMessages = [];
             if (socket) {
-                socket.emit('lecture:join', { lectureTitle: app.currentLectureTitle });
+                socket.emit('lecture:join', { lectureTitle: app.currentLectureTitle, userType: app.userType });
             }
             // Initialise board for lecturer
             app.$nextTick(() => {
@@ -579,6 +587,13 @@ function connect() {
             }, 3000);
         }
     });
+
+    socket.on('lecture:count:update', (data) => {
+    if (data.lectureTitle === app.currentLectureTitle) {
+        app.studentCount = data.studentCount;
+        }
+    });
+
 
     socket.on('modules:update:error', (msg) => {
         app.settingsError = msg;
