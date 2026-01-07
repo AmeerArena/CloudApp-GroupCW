@@ -10,7 +10,12 @@
             :class="{ 'selected': selectedBuilding === i }"
             @click="selectBuilding(i)"
         >
-            Building {{ i }}
+           <div> Building {{ i }}</div>
+           
+           <div v-if = "buildingLectures[i]" class ="lecture-running"> 
+                <div>Lecture: <strong>{{buildingLectures[i].title}} </strong></div>
+                <div>Module:{{buildingLectures[i].module}}</div>
+           </div>
         </div>
     </div>
 

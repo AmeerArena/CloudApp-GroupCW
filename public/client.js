@@ -370,6 +370,18 @@ var app = new Vue({
     }
 });
 
+function updateUserDisplay() {
+    const x = document.getElementById("userDisplay");
+    if (!x) return;
+
+    if (app.me && app.me.name && app.userType){
+        x.style.display ="block";
+        x.textContent = `Logged in as: ${app.me.name} (${app.userType})`;
+    } else {
+        x.style.displat = "none";
+    }
+}
+
 function connect() {
     if (socket) return;
 
@@ -395,6 +407,7 @@ function connect() {
         if (socket) {
             socket.userName = app.me.name;
         }
+        updateUserDisplay();
     });
 
     // Login lecturer
@@ -412,6 +425,7 @@ function connect() {
         if (socket) {
             socket.userName = app.me.name;
         }
+        updateUserDisplay();
     });
 
     // Register student
@@ -480,7 +494,7 @@ function connect() {
     // Building lecture updates: receive broadcast when lectures start/end in buildings
     socket.on('lecture:building:update', (data) => {
         if (data.building && data.lecture) {
-            app.buildingLectures[data.building] = data.lecture;
+            app.buildingLectures[Number(data.building)] = data.lecture;
         }
     });
 
@@ -573,6 +587,8 @@ function connect() {
     socket.on('disconnect', function () {
         console.log('Socket disconnected');
         app.connected = false;
+        updateUserDisplay();
+
         socket = null;
     });
 }
