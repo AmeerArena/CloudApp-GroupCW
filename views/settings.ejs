@@ -1,0 +1,65 @@
+<div class="w-full max-w-md mx-auto text-center mt-5">
+    
+    <!-- Back Button -->
+    <div class="d-flex justify-content-start mb-3">
+        <button
+            class="btn btn-link p-0"
+            @click="goBack"
+            style="text-decoration: none; color: inherit;"
+        >
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" class="bi bi-arrow-left" viewBox="0 0 16 16">
+                <path fill-rule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8z"/>
+            </svg>
+        </button>
+    </div>
+
+    <!-- Title -->
+    <h2 class="mb-4">Settings</h2>
+
+    <!-- Update Modules Section -->
+    <div class="mb-4">
+        <h4 class="mb-3">Update Modules</h4>
+        
+        <div v-if="isLecturer">
+            <p class="text-muted mb-3">Select 3 modules (Lecturers must have exactly 3 modules)</p>
+            <div v-for="(m, i) in updatedModules" :key="i" class="mb-2">
+                <select v-model="updatedModules[i]" class="form-control">
+                    <option disabled value="">Select module {{ i + 1 }}</option>
+                    <option v-for="mod in modules" :value="mod" :key="mod">
+                        {{ mod }}
+                    </option>
+                </select>
+            </div>
+        </div>
+
+        <div v-else>
+            <p class="text-muted mb-3">Select 4 modules (Students must have exactly 4 modules)</p>
+            <div v-for="(m, i) in updatedModules" :key="i" class="mb-2">
+                <select v-model="updatedModules[i]" class="form-control">
+                    <option disabled value="">Select module {{ i + 1 }}</option>
+                    <option v-for="mod in modules" :value="mod" :key="mod">
+                        {{ mod }}
+                    </option>
+                </select>
+            </div>
+        </div>
+
+        <button
+            class="btn btn-primary mt-3"
+            @click="updateModules"
+            :disabled="!canUpdateModules"
+        >
+            Update Modules
+        </button>
+    </div>
+
+    <!-- Error/Success Messages -->
+    <p v-if="settingsError" class="text-danger mt-3">
+        {{ settingsError }}
+    </p>
+    <p v-if="settingsSuccess" class="text-success mt-3">
+        {{ settingsSuccess }}
+    </p>
+
+</div>
+

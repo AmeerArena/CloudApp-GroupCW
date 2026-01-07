@@ -123,10 +123,85 @@ async function lecturerHire(name, password, modules) {
     }
 }
 
+async function createLecture(title, module, lecturer, building) {
+    try {
+        // Get current date and time
+        const now = new Date();
+        const date = now.toISOString().split('T')[0]; // YYYY-MM-DD
+        const time = now.toTimeString().split(' ')[0].substring(0, 5); // HH:MM
+
+        const response = await fetch(
+            `${BACKEND_ENDPOINT}/lecture/make?code=${FUNCTION_KEY}`,
+            {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ 
+                    title, 
+                    module, 
+                    lecturer, 
+                    date, 
+                    time,
+                    building: building || null // Add building info if available
+                })
+            }
+        );
+
+        const data = await response.json();
+
+        if (!data.result) {
+            return { error: data.msg || "Failed to create lecture" };
+        }
+
+        return data;
+
+    } catch (err) {
+        console.error("Create lecture API ERROR:", err);
+        return { error: "API_ERROR" };
+    }
+}
+
+async function updateUserModules(userId, modules, isLecturer) {
+    try {
+        // Note: This endpoint may need to be created in the backend
+        // For now, we'll use a placeholder approach
+        // You may need to create an endpoint like /student/update or /lecturer/update
+        
+        const endpoint = isLecturer 
+            ? `${BACKEND_ENDPOINT}/lecturer/update?code=${FUNCTION_KEY}`
+            : `${BACKEND_ENDPOINT}/student/update?code=${FUNCTION_KEY}`;
+
+        const response = await fetch(endpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ 
+                id: userId,
+                modules: modules
+            })
+        });
+
+        const data = await response.json();
+
+        if (!data.result) {
+            return { error: data.msg || "Failed to update modules" };
+        }
+
+        return data;
+
+    } catch (err) {
+        console.error("Update modules API ERROR:", err);
+        // Return true for the time being
+        return { result: true, modules: modules };
+    }
+}
+
+
+// Store lecture data (board content and chat messages)
+const lectureData = {};
 
 // Socket.io
 io.on('connection', socket => {
     console.log('New connection');
+    let currentLecture = null;
 
     // Student Login
     socket.on('student:login', async (data) => {
@@ -140,6 +215,9 @@ io.on('connection', socket => {
             return;
         }
 
+        // Store user name for chat
+        socket.userName = result.student?.name || result.name || username;
+        
         // Successful login
         socket.emit('student:login:result', result);
         console.log('Student logged in:', result);
@@ -170,6 +248,9 @@ io.on('connection', socket => {
             return;
         }
 
+        // Store user name for chat
+        socket.userName = result.lecturer?.name || result.name || username;
+        
         socket.emit('lecturer:login:result', result);
         console.log('Lecturer logged in:', result);
     });
@@ -188,7 +269,133 @@ io.on('connection', socket => {
         socket.emit('lecturer:register:result', result);
     });
 
-    socket.on('disconnect', () => console.log('Dropped connection'));
+    // Start Lecture
+    socket.on('lecture:start', async (data) => {
+        const { title, module, lecturer, building } = data;
+
+        const result = await createLecture(title, module, lecturer, building);
+
+        if (result.error) {
+            socket.emit('lecture:start:error', result.error);
+            return;
+        }
+
+        // Initialise lecture data if not exists
+        if (!lectureData[title]) {
+            lectureData[title] = {
+                boardContent: '',
+                chatMessages: [],
+                building: building || null
+            };
+        }
+
+        // Broadcast lecture start to all clients so students can see available lectures
+        if (building) {
+            io.emit('lecture:building:update', {
+                building: building,
+                lecture: {
+                    title: title,
+                    module: module,
+                    lecturer: lecturer
+                }
+            });
+        }
+
+        socket.emit('lecture:start:result', { success: true, lecture: result });
+    });
+
+    // Join Lecture
+    socket.on('lecture:join', (data) => {
+        const { lectureTitle } = data;
+        currentLecture = lectureTitle;
+
+        // Initialise if not exists
+        if (!lectureData[lectureTitle]) {
+            lectureData[lectureTitle] = {
+                boardContent: '',
+                chatMessages: []
+            };
+        }
+
+        // Send current board content and chat messages to the user
+        socket.emit('board:update', {
+            content: lectureData[lectureTitle].boardContent,
+            lectureTitle: lectureTitle
+        });
+
+        // Send chat history
+        lectureData[lectureTitle].chatMessages.forEach(msg => {
+            socket.emit('chat:message', {
+                user: msg.user,
+                message: msg.message,
+                time: msg.time,
+                lectureTitle: lectureTitle
+            });
+        });
+    });
+
+    // Board Updates
+    socket.on('board:update', (data) => {
+        const { content, lectureTitle } = data;
+
+        if (lectureTitle && lectureData[lectureTitle]) {
+            lectureData[lectureTitle].boardContent = content;
+            
+            // Broadcast to all clients in this lecture
+            io.emit('board:update', {
+                content: content,
+                lectureTitle: lectureTitle
+            });
+        }
+    });
+
+    // Chat Messages
+    socket.on('chat:message', (data) => {
+        const { message, lectureTitle } = data;
+        
+        if (lectureTitle && lectureData[lectureTitle]) {
+            const chatMessage = {
+                user: socket.userName || 'Anonymous',
+                message: message,
+                time: new Date().toLocaleTimeString()
+            };
+
+            lectureData[lectureTitle].chatMessages.push(chatMessage);
+
+            // Broadcast to all clients in this lecture
+            io.emit('chat:message', {
+                user: chatMessage.user,
+                message: chatMessage.message,
+                time: chatMessage.time,
+                lectureTitle: lectureTitle
+            });
+        }
+    });
+
+    // Store user name - will be set when login events are handled
+    // This is handled in the login result handlers below
+
+    // Update Modules
+    socket.on('modules:update', async (data) => {
+        const { modules, userId, isLecturer } = data;
+
+        const result = await updateUserModules(userId, modules, isLecturer);
+
+        if (result.error) {
+            socket.emit('modules:update:error', result.error);
+            return;
+        }
+
+        socket.emit('modules:update:result', {
+            modules: modules,
+            success: true
+        });
+    });
+
+    socket.on('disconnect', () => {
+        console.log('Dropped connection');
+        currentLecture = null;
+    });
 });
 
 

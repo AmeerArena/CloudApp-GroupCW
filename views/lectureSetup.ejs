@@ -1,0 +1,66 @@
+<div class="w-full max-w-md mx-auto text-center mt-5">
+    
+    <!-- Back Button -->
+    <div class="d-flex justify-content-start mb-3">
+        <button
+            class="btn btn-link p-0"
+            @click="goBack"
+            style="text-decoration: none; color: inherit;"
+        >
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" class="bi bi-arrow-left" viewBox="0 0 16 16">
+                <path fill-rule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8z"/>
+            </svg>
+        </button>
+    </div>
+
+    <!-- Title -->
+    <h2 class="mb-4">Lecture Setup</h2>
+
+    <!-- Selected Building Display -->
+    <div v-if="selectedBuilding" class="mb-3">
+        <p class="text-muted">
+            <strong>Selected Building:</strong> Building {{ selectedBuilding }}
+        </p>
+    </div>
+
+    <!-- Lecture Title Input -->
+    <div class="mb-3">
+        <input
+            type="text"
+            v-model="lectureTitle"
+            placeholder="(lecture Title)"
+            class="form-control"
+        >
+    </div>
+
+    <!-- Module Selection Dropdown -->
+    <div class="mb-4">
+        <select
+            v-model="selectedModule"
+            class="form-control"
+        >
+            <option disabled value="">(lecture module)</option>
+            <option v-for="module in lecturerModules" :key="module" :value="module">
+                {{ module }}
+            </option>
+        </select>
+    </div>
+
+    <!-- Start Lecture Button -->
+    <div class="mb-3">
+        <button
+            class="btn btn-primary btn-lg"
+            @click="startLecture"
+            :disabled="!lectureTitle || !selectedModule"
+        >
+            Start Lecture
+        </button>
+    </div>
+
+    <!-- Error Message -->
+    <p v-if="lectureError" class="text-danger mt-3">
+        {{ lectureError }}
+    </p>
+
+</div>
+

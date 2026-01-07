@@ -1,0 +1,92 @@
+<div class="homepage-container">
+    <h2 class="text-center mb-4">Homepage</h2>
+    
+    <!-- Building Grid -->
+    <div class="building-grid mb-4">
+        <div 
+            v-for="i in 12" 
+            :key="i"
+            class="building-box"
+            :class="{ 'selected': selectedBuilding === i }"
+            @click="selectBuilding(i)"
+        >
+            Building {{ i }}
+        </div>
+    </div>
+
+    <!-- Action Buttons: role-based actions after building selection -->
+    <div class="d-flex justify-content-center gap-3">
+        <!-- Lecturers: start lecture in selected building -->
+        <button
+            v-if="isLecturer && selectedBuilding"
+            class="btn btn-primary btn-lg"
+            @click="showStartLectureModal = true"
+        >
+            Start Lecture
+        </button>
+
+        <!-- Students: attend lecture if building has active lecture -->
+        <button
+            v-if="!isLecturer && selectedBuilding && hasLectureInBuilding(selectedBuilding)"
+            class="btn btn-success btn-lg"
+            @click="attendLecture"
+        >
+            Attend Lecture
+        </button>
+    </div>
+
+    <!-- Info Message -->
+    <div v-if="selectedBuilding && !isLecturer && !hasLectureInBuilding(selectedBuilding)" class="text-center mt-3">
+        <p class="text-muted">No active lecture in Building {{ selectedBuilding }}</p>
+    </div>
+
+    <!-- Start Lecture Modal (Lecturers) -->
+    <div v-if="showStartLectureModal" class="modal" style="display: block; background-color: rgba(0,0,0,0.5);" @click.self="showStartLectureModal = false">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Start Lecture in Building {{ selectedBuilding }}</h5>
+                    <button type="button" class="btn-close" @click="showStartLectureModal = false"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Lecture Title</label>
+                        <input
+                            type="text"
+                            v-model="quickLectureTitle"
+                            placeholder="Enter lecture title"
+                            class="form-control"
+                        >
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Module</label>
+                        <select
+                            v-model="quickSelectedModule"
+                            class="form-control"
+                        >
+                            <option disabled value="">Select module</option>
+                            <option v-for="module in lecturerModules" :key="module" :value="module">
+                                {{ module }}
+                            </option>
+                        </select>
+                    </div>
+                    <p v-if="quickLectureError" class="text-danger">{{ quickLectureError }}</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @click="showStartLectureModal = false">
+                        Cancel
+                    </button>
+                    <button 
+                        type="button" 
+                        class="btn btn-primary"
+                        @click="startLectureFromHomepage"
+                        :disabled="!quickLectureTitle || !quickSelectedModule"
+                    >
+                        Start Lecture
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
