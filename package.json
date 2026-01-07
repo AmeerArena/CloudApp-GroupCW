@@ -1,7 +1,7 @@
 {
-  "name": "ecsexample",
+  "name": "courseworkgroupc",
   "version": "1.0.0",
-  "description": "ECS Example Game",
+  "description": "The Learning Curve",
   "main": "app.js",
   "engines": {
     "node": "20.x"
@@ -11,12 +11,12 @@
     "gdeploy": "gcloud app deploy --version test",
     "hdeploy": "git push heroku master"
   },
-  "author": "Oli Bills",
+  "author": "COMP3207 Group C",
   "license": "ECS",
   "dependencies": {
     "axios": "^1.13.2",
-    "ejs": "^3.1.6",
-    "express": "^4.17.1",
-    "socket.io": "^4.3.1"
+    "ejs": "^3.1.10",
+    "express": "^4.22.1",
+    "socket.io": "^4.8.3"
   }
 }

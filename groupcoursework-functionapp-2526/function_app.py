@@ -530,7 +530,7 @@ def lecture_set_module(req: func.HttpRequest) -> func.HttpResponse:
     #Simple query if the lecture exists
     lecturers=list(LecturerContainter.query_items(
         query="SELECT * FROM l WHERE l.name =@name",
-        parameters=({"name": "@name", "value": lecturer_name}),
+        parameters=[{"name": "@name", "value": lecturer_name}],
         enable_cross_partition_query=True
     ))
 
@@ -556,10 +556,17 @@ def lecture_set_module(req: func.HttpRequest) -> func.HttpResponse:
         room = {"id": room_id, "roomId": room_id, "status": "empty", "module": None, "lecturer": None, "startedAt": None}
         RoomContainer.create_item(body=room)
         room = list(RoomContainer.query_items(
-            query="SELECT * FROM r WHERE r.id = @r.id",
+            query="SELECT * FROM r WHERE r.id = @rid",
             parameters=[{"name": "@rid", "value": room_id}],
             enable_cross_partition_query=True
         ))[0]
+    room["module"] = module
+
+    RoomContainer.replace_item(item=room["id"], body=room)
+    return json_resp(
+        {"result": True, "msg": "module set", "room": room},
+        status=200
+    )
 
 @app.route(route="lecture/setLecturer", auth_level=func.AuthLevel.FUNCTION, methods=["POST"])
 def lecture_set_lecturer(req: func.HttpRequest) -> func.HttpResponse:
@@ -605,10 +612,11 @@ def lecture_set_lecturer(req: func.HttpRequest) -> func.HttpResponse:
         room = {"id": room_id, "roomId": room_id, "status": "empty", "module": None, "lecturer": None, "startedAt": None}
         RoomContainer.create_item(body=room)
         room = list(RoomContainer.query_items(
-            query="SELECT * FROM r WHERE r.id = @r.id",
+            query="SELECT * FROM r WHERE r.id = @rid",
             parameters=[{"name": "@rid", "value": room_id}],
             enable_cross_partition_query=True
         ))[0]
+    
     
     # Other lecturer cannot take away another lecturers room
     if action == "start":
@@ -618,6 +626,7 @@ def lecture_set_lecturer(req: func.HttpRequest) -> func.HttpResponse:
         room["lecturer"] = lecturer_name
         room["status"] = "booked"
         room["startedAt"] = datetime.datetime.now(datetime.timezone.utc).isoformat() + "Z"
+        RoomContainer.replace_item(item=room["id"], body=room)
         return json_resp({"result": True, "msg": "lecturer set", "room": room}, status=200)
     
     #End
@@ -690,6 +699,7 @@ def student_modules_get(req: func.HttpRequest) -> func.HttpResponse:
     s = students[0]
     return json_resp({"result": True, "modules": s.get("modules", [])}, status=200)
 
+
 @app.route(route="student/modules/replace", auth_level=func.AuthLevel.FUNCTION, methods=["POST"])
 def student_modules_replace(req: func.HttpRequest) -> func.HttpResponse:
     data, err = parse_json(req)
@@ -724,6 +734,8 @@ def student_modules_replace(req: func.HttpRequest) -> func.HttpResponse:
 
     return json_resp({"result": True, "msg": "OK", "modules": modules}, status=200)
 
+
+
 @app.route(route="lecturer/modules/get", auth_level=func.AuthLevel.FUNCTION, methods=["GET"])
 def lecturer_modules_get(req: func.HttpRequest) -> func.HttpResponse:
     name = (req.params.get("name") or "").strip()
@@ -741,6 +753,7 @@ def lecturer_modules_get(req: func.HttpRequest) -> func.HttpResponse:
 
     l = lecturers[0]
     return json_resp({"result": True, "modules": l.get("modules", [])}, status=200)
+
 
 @app.route(route="lecturer/modules/replace", auth_level=func.AuthLevel.FUNCTION, methods=["POST"])
 def lecturer_modules_replace(req: func.HttpRequest) -> func.HttpResponse:
@@ -775,6 +788,7 @@ def lecturer_modules_replace(req: func.HttpRequest) -> func.HttpResponse:
     LecturerContainer.replace_item(item=l["id"], body=l)
 
     return json_resp({"result": True, "msg": "OK", "modules": modules}, status=200)
+
 
 @app.route(route="lecture/student/add", auth_level=func.AuthLevel.FUNCTION, methods=["POST"])
 def lecture_student_add(req: func.HttpRequest) -> func.HttpResponse:
@@ -827,6 +841,7 @@ def lecture_student_remove(req: func.HttpRequest) -> func.HttpResponse:
     get_lecture_container().upsert_item(body=doc)
 
     return json_resp({"result": True, "msg": "OK", "students": doc["students"]}, status=200)
+
 
 @app.route(route="lecture/end", auth_level=func.AuthLevel.FUNCTION, methods=["POST"])
 def lecture_end(req: func.HttpRequest) -> func.HttpResponse:
