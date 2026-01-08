@@ -125,39 +125,78 @@ async function lecturerHire(name, password, modules) {
     }
 }
 
-async function createLecture(title, module, lecturer, building) {
+async function startLectureFixed(lectureId, title, module, lecturer) {
     try {
-        // Get current date and time
-        const now = new Date();
-        const date = now.toISOString().split('T')[0]; // YYYY-MM-DD
-        const time = now.toTimeString().split(' ')[0].substring(0, 5); // HH:MM
-
-        const response = await fetch(
-            `${BACKEND_ENDPOINT}/lecture/make?code=${FUNCTION_KEY}`,
+        // Set module + title
+        const modRes = await fetch(
+            `${BACKEND_ENDPOINT}/lecture/setModule?code=${FUNCTION_KEY}`,
             {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ 
-                    title, 
-                    module, 
-                    lecturer, 
-                    date, 
-                    time,
-                    building: building || null // Add building info if available
+                body: JSON.stringify({
+                    id: String(lectureId),
+                    title: title,
+                    module: module
                 })
             }
         );
 
-        const data = await response.json();
+        const modData = await modRes.json();
+        if (!modData.result) {
+            return { error: modData.msg || "Failed to set module" };
+        }
 
+        // Set lecturer + date/time
+        const now = new Date();
+        const date = now.toISOString().split("T")[0];
+        const time = now.toTimeString().substring(0, 5);
+
+        const lecRes = await fetch(
+            `${BACKEND_ENDPOINT}/lecture/setLecturer?code=${FUNCTION_KEY}`,
+            {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    id: String(lectureId),
+                    lecturer: lecturer,
+                    date: date,
+                    time: time
+                })
+            }
+        );
+
+        const lecData = await lecRes.json();
+        if (!lecData.result) {
+            return { error: lecData.msg || "Failed to set lecturer" };
+        }
+
+        return { result: true };
+
+    } catch (err) {
+        console.error("startLectureFixed ERROR:", err);
+        return { error: "API_ERROR" };
+    }
+}
+
+async function endLectureFixed(lectureId) {
+    try {
+        const response = await fetch(
+            `${BACKEND_ENDPOINT}/lecture/end?code=${FUNCTION_KEY}`,
+            {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ id: String(lectureId) })
+            }
+        );
+
+        const data = await response.json();
         if (!data.result) {
-            return { error: data.msg || "Failed to create lecture" };
+            return { error: data.msg || "Failed to end lecture" };
         }
 
         return data;
-
     } catch (err) {
-        console.error("Create lecture API ERROR:", err);
+        console.error("endLectureFixed ERROR:", err);
         return { error: "API_ERROR" };
     }
 }
@@ -275,35 +314,41 @@ io.on('connection', socket => {
     socket.on('lecture:start', async (data) => {
         const { title, module, lecturer, building } = data;
 
-        const result = await createLecture(title, module, lecturer, building);
+        const lectureId = building; // building = lecture ID (1–12)
+
+        const result = await startLectureFixed(
+            lectureId,
+            title,
+            module,
+            lecturer
+        );
 
         if (result.error) {
             socket.emit('lecture:start:error', result.error);
             return;
         }
 
-        // Initialise lecture data if not exists
-        if (!lectureData[title]) {
-            lectureData[title] = {
-                boardContent: '',
-                chatMessages: [],
-                building: building || null
-            };
-        }
+        // Store lecture locally
+        lectureData[lectureId] = {
+            boardContent: '',
+            chatMessages: []
+        };
 
-        // Broadcast lecture start to all clients so students can see available lectures
-        if (building) {
-            io.emit('lecture:building:update', {
-                building: building,
-                lecture: {
-                    title: title,
-                    module: module,
-                    lecturer: lecturer
-                }
-            });
-        }
+        // Broadcast building update
+        io.emit('lecture:building:update', {
+            building: lectureId,
+            lecture: {
+                id: lectureId,
+                title,
+                module,
+                lecturer
+            }
+        });
 
-        socket.emit('lecture:start:result', { success: true, lecture: result });
+        socket.emit('lecture:start:result', {
+            success: true,
+            lectureId: lectureId
+        });
     });
 
     // Join Lecture
@@ -352,6 +397,18 @@ io.on('connection', socket => {
                 lectureTitle: lectureTitle
             });
         });
+    });
+
+    socket.on('lecture:end', async (lectureId) => {
+        await endLectureFixed(lectureId);
+        
+        // Notify all clients
+        io.emit('lecture:ended', {
+            lectureId: lectureId
+        });
+    
+        delete lectureData[lectureId];
+        delete lectureParticipants[lectureId];
     });
 
     // Board Updates
@@ -413,23 +470,14 @@ io.on('connection', socket => {
     });
 
     socket.on('disconnect', () => {
-    console.log('Dropped connection');
-
-    if (currentLecture && lectureParticipants[currentLecture]) {
-        delete lectureParticipants[currentLecture][socket.id];
-
-        const participants = Object.values(lectureParticipants[currentLecture]);
-        const studentCount = participants.filter(p => p.userType !== "lecturer").length;
-
-        io.emit('lecture:count:update', {
-            lectureTitle: currentLecture,
-            studentCount
-        });
-    }
-
-    currentLecture = null;
+        console.log('Dropped connection');
+        
+        if (currentLecture && lectureParticipants[currentLecture]) {
+            delete lectureParticipants[currentLecture][socket.id];
+        }
+    
+        currentLecture = null;
     });
-
 });
 
 

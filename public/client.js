@@ -40,6 +40,8 @@ var app = new Vue({
         quickLectureError: '', // Error messages for homepage lecture start
 
         // lecture setup
+        currentLectureId: null,
+
         lectureTitle: '',
         selectedModule: '',
         lectureError: '',
@@ -191,6 +193,7 @@ var app = new Vue({
             }
 
             // Store lecture details and emit to server
+            this.currentLectureId = String(this.selectedBuilding);
             this.currentLectureTitle = this.quickLectureTitle;
             this.selectedModule = this.quickSelectedModule;
             socket.emit('lecture:start', {
@@ -217,11 +220,15 @@ var app = new Vue({
                 return;
             }
             const lecture = this.buildingLectures[this.selectedBuilding];
-            this.currentLectureTitle = lecture.title || `Lecture in Building ${this.selectedBuilding}`;
+            this.currentLectureId = String(this.selectedBuilding);
+            this.currentLectureTitle = lecture.title || `Building ${this.selectedBuilding}`;
             this.currentLectureModule = lecture.module || '';
             this.page = 'inLecture';
             if (socket) {
-                socket.emit('lecture:join', { lectureTitle: this.currentLectureTitle, userType: this.userType });
+                socket.emit('lecture:join', {
+                    lectureTitle: String(this.selectedBuilding),
+                    userType: this.userType
+                });
             }
         },
 
@@ -262,6 +269,7 @@ var app = new Vue({
                 return;
             }
 
+            this.currentLectureId = String(this.selectedBuilding);
             this.currentLectureTitle = this.lectureTitle;
             socket.emit('lecture:start', {
                 title: this.lectureTitle,
@@ -288,7 +296,7 @@ var app = new Vue({
                 // Emit board update to server
                 socket.emit('board:update', {
                     content: content,
-                    lectureTitle: this.currentLectureTitle
+                    lectureTitle: this.currentLectureId
                 });
             }, 300); // Wait 300ms after user stops typing
         },
@@ -304,19 +312,21 @@ var app = new Vue({
 
             socket.emit('chat:message', {
                 message: message.message,
-                lectureTitle: this.currentLectureTitle
+                lectureTitle: this.currentLectureId
             });
 
             this.chatInput = '';
         },
 
         exitLecture() {
-            if (this.isLecturer) {
-                this.page = 'lectureSetup';
-            } else {
-                this.page = 'dashboard';
+            if (this.isLecturer && this.currentLectureId) {
+                socket.emit('lecture:end', this.currentLectureId);
             }
+        
+            this.page = 'homepage';
             this.currentLectureTitle = '';
+            this.currentLectureId = null;
+            this.currentLectureModule = '';
             this.boardContent = '';
             this.chatMessages = [];
             this.chatInput = '';
@@ -404,6 +414,7 @@ function connect() {
     socket.on('student:login:result', (data) => {
         // Student login: navigate to homepage for building selection
         console.log('LOGIN RESULT:', data);
+        
         app.me = data.student || data;
         app.userType = 'student';
         app.page = 'homepage';
@@ -469,13 +480,12 @@ function connect() {
             }
         } else {
             // Store lecture in building and join lecture room
-            if (app.selectedBuilding) {
-                app.buildingLectures[app.selectedBuilding] = {
-                    title: app.currentLectureTitle,
-                    module: app.selectedModule,
-                    lecturer: app.me.name
-                };
-            }
+            app.buildingLectures[app.selectedBuilding] = {
+                id: app.selectedBuilding,
+                title: app.currentLectureTitle,
+                module: app.selectedModule,
+                lecturer: app.me.name
+            };
 
             app.currentLectureModule = app.selectedModule || '';
             app.studentCount = 0;
@@ -484,7 +494,10 @@ function connect() {
             app.boardContent = '';
             app.chatMessages = [];
             if (socket) {
-                socket.emit('lecture:join', { lectureTitle: app.currentLectureTitle, userType: app.userType });
+                socket.emit('lecture:join', {
+                    lectureTitle: String(this.selectedBuilding),
+                    userType: this.userType
+                });
             }
             // Initialise board for lecturer
             app.$nextTick(() => {
@@ -501,14 +514,28 @@ function connect() {
 
     // Building lecture updates: receive broadcast when lectures start/end in buildings
     socket.on('lecture:building:update', (data) => {
-        if (data.building && data.lecture) {
-            app.buildingLectures[Number(data.building)] = data.lecture;
+        if (!data.lecture) {
+            delete app.buildingLectures[data.building];
+        } else {
+            app.buildingLectures[data.building] = data.lecture;
+        }
+    });
+
+    socket.on('lecture:ended', (data) => {
+        if (data.lectureId === app.currentLectureId) {
+            app.page = 'homepage';
+            app.currentLectureTitle = '';
+            app.currentLectureId = null;
+            app.currentLectureModule = '';
+            app.boardContent = '';
+            app.chatMessages = [];
+            app.chatInput = '';
         }
     });
 
     // Board updates
     socket.on('board:update', (data) => {
-        if (data.lectureTitle === app.currentLectureTitle) {
+        if (data.lectureTitle === app.currentLectureId) {
             // For lecturer: update the ref directly without using v-html
             if (app.isLecturer) {
                 // Lecturer: update the contenteditable div directly via ref
@@ -556,7 +583,7 @@ function connect() {
 
     // Chat messages
     socket.on('chat:message', (data) => {
-        if (data.lectureTitle === app.currentLectureTitle) {
+        if (data.lectureTitle === app.currentLectureId) {
             app.chatMessages.push({
                 user: data.user,
                 message: data.message,
@@ -589,11 +616,10 @@ function connect() {
     });
 
     socket.on('lecture:count:update', (data) => {
-    if (data.lectureTitle === app.currentLectureTitle) {
-        app.studentCount = data.studentCount;
+        if (data.lectureTitle === app.currentLectureId) {
+            app.studentCount = data.studentCount;
         }
     });
-
 
     socket.on('modules:update:error', (msg) => {
         app.settingsError = msg;
