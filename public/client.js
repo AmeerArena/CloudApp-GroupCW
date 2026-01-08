@@ -376,7 +376,7 @@ var app = new Vue({
 
             socket.emit('modules:update', {
                 modules: modules,
-                userId: this.me.id || this.me.name,
+                userId: this.me.name || this.me.id, 
                 isLecturer: this.isLecturer
             });
         }
