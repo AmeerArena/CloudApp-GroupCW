@@ -313,16 +313,23 @@ var app = new Vue({
         },
 
         exitLecture() {
-            if (this.isLecturer) {
-                this.page = 'lectureSetup';
-            } else {
-                this.page = 'dashboard';
+            if (this.isLecturer && this.currentLectureId) {
+            socket.emit('lecture:end', this.currentLectureId);
             }
+
+            this.resetLectureState();
+        },
+
+        resetLectureState() {
+            this.page = 'homepage';
+            this.currentLectureId = null;
             this.currentLectureTitle = '';
+            this.currentLectureModule = '';
             this.boardContent = '';
             this.chatMessages = [];
             this.chatInput = '';
         },
+
 
         goToSettings() {
             this.page = 'settings';
@@ -618,6 +625,13 @@ function connect() {
     socket.on('modules:update:error', (msg) => {
         app.settingsError = msg;
     });
+
+    socket.on('lecture:force-exit', (lectureId) => {
+    if (app.currentLectureId === lectureId) {
+        app.resetLectureState();
+        alert('The lecture\'s been ended by the lecturer.');}
+    });
+
 
     socket.on('disconnect', function () {
         console.log('Socket disconnected');

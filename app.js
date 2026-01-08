@@ -509,6 +509,29 @@ io.on('connection', socket => {
         });
     });
 
+    socket.on('lecture:end', async (lectureId) => {
+    // 1️Clear DB lecture
+    await fetch(`${BACKEND_ENDPOINT}/lecture/end?code=${FUNCTION_KEY}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: lectureId })
+    });
+
+    // 2 Remove lecture from memory
+    delete lectureData[lectureId];
+    delete lectureParticipants[lectureId];
+
+    // 3 Remove lecture from building grid for everyone
+    io.emit('lecture:building:update', {
+        building: Number(lectureId),
+        lecture: null
+    });
+
+    // 4 Remove all users out of the room
+    io.emit('lecture:force-exit', lectureId);
+    });
+
+
     socket.on('disconnect', () => {
     console.log('Dropped connection');
 
