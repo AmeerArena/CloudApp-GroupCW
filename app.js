@@ -26,6 +26,7 @@ const BACKEND_ENDPOINT = process.env.BACKEND || 'https://groupcoursework-functio
 
 const FUNCTION_KEY = process.env.FUNCTION_KEY || 'hsuAcj6yIqFu2S-duKquK2DXhpg85E_BZjvxPqrC84HmAzFuo27TyQ==';
 
+const activeSessions = new Map();
 
 async function studentLogin(username, password) {
     try {
@@ -277,6 +278,18 @@ io.on('connection', socket => {
             return;
         }
 
+        const studentObj = result.student || result;
+        const studentId = studentObj.id ? String(studentObj.id): String(studentObj.name || username).toLowerCase();
+        const key = `student:${studentId}`;
+
+        if(activeSessions.has(key)){
+            socket.emit('login:error', 'Student already logged in on another session. End session before logging in again.');
+            return;
+        }
+
+        activeSessions.set(key, socket.id);
+        socket.sessionKey = key;
+
         // Store user name for chat
         socket.userName = result.student?.name || result.name || username;
         
@@ -309,6 +322,18 @@ io.on('connection', socket => {
             socket.emit('lecturer:login:error', result.error);
             return;
         }
+
+        const lecturerObj = result.lecturer || result; 
+        const lecturerId = lecturerObj.id ? String(lecturerObj.id): String(lecturerObj.name || username).toLowerCase();
+        const key = `lecturer:${lecturerId}`;
+
+        if (activeSessions.has(key)){
+            socket.emit('lecturer:login:error', 'Lecturer logged in on another session. End session before logging in again.');
+            return;
+        }
+
+        activeSessions.set(key, socket.id);
+        socket.sessionKey = key;
 
         // Store user name for chat
         socket.userName = result.lecturer?.name || result.name || username;
@@ -534,6 +559,10 @@ io.on('connection', socket => {
 
     socket.on('disconnect', () => {
     console.log('Dropped connection');
+    
+    if (socket.sessionKey&& activeSessions.get(socket.sessionKey) === socket.id){
+        activeSessions.delete(socket.sessionKey);
+    }
 
     if (currentLecture && lectureParticipants[currentLecture]) {
         delete lectureParticipants[currentLecture][socket.id];
