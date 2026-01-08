@@ -313,8 +313,10 @@ io.on('connection', socket => {
         activeSessions.set(key, socket.id);
         socket.sessionKey = key;
 
-        // Store user name for chat
+        // Store user name and type for chat
         socket.userName = result.student?.name || result.name || username;
+        socket.userType = 'student';
+        socket.modules = result.student?.modules || result.modules || [];
         
         // Successful login
         socket.emit('student:login:result', result);
@@ -357,8 +359,10 @@ io.on('connection', socket => {
         activeSessions.set(key, socket.id);
         socket.sessionKey = key;
 
-        // Store user name for chat
+        // Store user name and type for chat
         socket.userName = result.lecturer?.name || result.name || username;
+        socket.userType = 'lecturer';
+        socket.modules = result.lecturer?.modules || result.modules || [];
         
         socket.emit('lecturer:login:result', result);
     });
@@ -511,7 +515,8 @@ io.on('connection', socket => {
     }
 
         socket.emit('lecture:sync:result', { buildingLectures });
-});
+    });
+
 
 
     // Board Updates
@@ -579,34 +584,20 @@ io.on('connection', socket => {
         await endLecture(lectureId);
     });
 
-    // 2 Remove lecture from memory
-    delete lectureData[lectureId];
-    delete lectureParticipants[lectureId];
 
-    // 3 Remove lecture from building grid for everyone
-    io.emit('lecture:building:update', {
-        building: Number(lectureId),
-        lecture: null
-    });
-
-    // 4 Remove all users out of the room
-    io.emit('lecture:force-exit', lectureId);
-    });
-
-
+    // Dissconnect
     socket.on('disconnect', async () => {
-    console.log('Dropped connection');
-    
-    if (socket.sessionKey&& activeSessions.get(socket.sessionKey) === socket.id){
-        activeSessions.delete(socket.sessionKey);
-    }
+        console.log('Dropped connection');
+        if (socket.sessionKey&& activeSessions.get(socket.sessionKey) === socket.id){
+            activeSessions.delete(socket.sessionKey);
+        }
+
 
         if (currentLecture && lectureParticipants[currentLecture]) {
             const participant = lectureParticipants[currentLecture][socket.id];
 
             // if lecturer, end the lecture
             if (participant && participant.userType === 'lecturer') {
-                console.log(`Lecturer disconnected. Ending lecture ${currentLecture}`);
                 await endLecture(currentLecture);
                 return;
             }
@@ -625,7 +616,9 @@ io.on('connection', socket => {
 
         currentLecture = null;
     });
+
 });
+
 
 // Start server
 const PORT = process.env.PORT || 8080;
