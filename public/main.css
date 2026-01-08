@@ -91,7 +91,7 @@ body {
     cursor: pointer;
     transition: all 0.3s ease;
     min-height: 100px;
-    display: flex;
+    display: flex; 
     align-items: center;
     justify-content: center;
     font-weight: 500;
@@ -108,4 +108,16 @@ body {
     color: white;
     border-color: #0056b3;
     box-shadow: 0 4px 8px rgba(0, 123, 255, 0.3);
+
+    .building-box.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.building-box.disabled:hover {
+    background-color: white;
+    border-color: #dee2e6;
+    transform: none;
+}
+
 }

@@ -17,6 +17,9 @@ app.use('/static', express.static('public'));
 
 const lectureParticipants = {};
 
+const activeLectureByBuilding = {};
+
+
 //Handle client interface on /
 app.get('/', (req, res) => {
     res.render('client');
@@ -275,12 +278,38 @@ io.on('connection', socket => {
     socket.on('lecture:start', async (data) => {
         const { title, module, lecturer, building } = data;
 
+            // Block starting a lecture if the building already has an active lecture
+    if (building && activeLectureByBuilding[building]) {
+        const existing = activeLectureByBuilding[building];
+
+        // If a different lecturer is trying to start in the same building, reject
+        if (existing.lecturer !== lecturer) {
+            socket.emit(
+                'lecture:start:error',
+                `Building is already in use by ${existing.lecturer} for ${existing.module} (${existing.title}).`
+            );
+            return;
+        }
+    }
+
+
         const result = await createLecture(title, module, lecturer, building);
 
         if (result.error) {
             socket.emit('lecture:start:error', result.error);
             return;
         }
+
+                // Lock the building to this lecture
+        if (building) {
+            activeLectureByBuilding[building] = {
+                title,
+                module,
+                lecturer,
+                startedAt: Date.now()
+            };
+        }
+
 
         // Initialise lecture data if not exists
         if (!lectureData[title]) {

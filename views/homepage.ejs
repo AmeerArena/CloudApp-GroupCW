@@ -4,40 +4,64 @@
     <!-- Building Grid -->
     <div class="building-grid mb-4">
         <div 
-            v-for="i in 12" 
-            :key="i"
-            class="building-box"
-            :class="{ 'selected': selectedBuilding === i }"
-            @click="selectBuilding(i)"
-        >
-           <div> Building {{ i }}</div>
-           
-           <div v-if = "buildingLectures[i]" class ="lecture-running"> 
-                <div>Lecture: <strong>{{buildingLectures[i].title}} </strong></div>
-                <div>Module:{{buildingLectures[i].module}}</div>
-           </div>
-        </div>
+    v-for="i in 12" 
+    :key="i"
+    class="building-box"
+    :class="{
+        'selected': selectedBuilding === i,
+        'disabled': isLecturer 
+            ? isBuildingDisabledForLecturer(i) 
+            : isBuildingDisabledForStudent(i)
+    }"
+    @click="
+        (isLecturer 
+            ? !isBuildingDisabledForLecturer(i) 
+            : !isBuildingDisabledForStudent(i))
+        && selectBuilding(i)
+    "
+>
     </div>
 
     <!-- Action Buttons: role-based actions after building selection -->
     <div class="d-flex justify-content-center gap-3">
         <!-- Lecturers: start lecture in selected building -->
         <button
-            v-if="isLecturer && selectedBuilding"
-            class="btn btn-primary btn-lg"
-            @click="showStartLectureModal = true"
-        >
-            Start Lecture
-        </button>
+    v-if="isLecturer && selectedBuilding"
+    class="btn btn-primary btn-lg"
+    @click="showStartLectureModal = true"
+    :disabled="isBuildingDisabledForLecturer(selectedBuilding)"
+>
+    Start Lecture
+</button>
+
 
         <!-- Students: attend lecture if building has active lecture -->
-        <button
-            v-if="!isLecturer && selectedBuilding && hasLectureInBuilding(selectedBuilding)"
-            class="btn btn-success btn-lg"
-            @click="attendLecture"
-        >
-            Attend Lecture
-        </button>
+       <button
+    v-if="!isLecturer && selectedBuilding && hasLectureInBuilding(selectedBuilding)"
+    class="btn btn-success btn-lg"
+    @click="attendLecture"
+    :disabled="isBuildingDisabledForStudent(selectedBuilding)"
+>
+    Attend Lecture
+</button>
+<!-- Lecturer lock message -->
+<div v-if="isLecturer && selectedBuilding && isBuildingDisabledForLecturer(selectedBuilding)"
+     class="text-center mt-3 text-danger">
+    <p>
+        This building already has a lecture running by another lecturer.
+    </p>
+</div>
+
+<!-- Student module mismatch message -->
+<div v-if="!isLecturer && selectedBuilding && hasLectureInBuilding(selectedBuilding) 
+            && isBuildingDisabledForStudent(selectedBuilding)"
+     class="text-center mt-3 text-warning">
+    <p>
+        You are not enrolled in the module for this lecture.
+    </p>
+</div>
+
+
     </div>
 
     <!-- Info Message -->

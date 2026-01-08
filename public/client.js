@@ -13,7 +13,7 @@ var app = new Vue({
         loginError: '',
 
         // student or lecturer
-        role: null,               
+        role: null,
         selectedBuilding: null,
         buildings: Array.from({ length: 12 }, (_, i) => `Building-${String(i + 1).padStart(2, "0")}`),
 
@@ -210,6 +210,20 @@ var app = new Vue({
             // Check if building has an active lecture
             return this.buildingLectures[buildingNumber] !== undefined;
         },
+
+            isBuildingDisabledForLecturer(building) {
+            const lec = this.buildingLectures[building];
+            return !!(lec && this.isLecturer && lec.lecturer !== this.me.name);
+        },
+
+            isBuildingDisabledForStudent(building) {
+                const lec = this.buildingLectures[building];
+                if (!lec) return true;
+
+                const myModules = (this.me && this.me.modules) ? this.me.modules : [];
+                return !myModules.includes(lec.module);
+            },
+
 
         attendLecture() {
             // Student joins lecture in selected building
@@ -501,10 +515,11 @@ function connect() {
 
     // Building lecture updates: receive broadcast when lectures start/end in buildings
     socket.on('lecture:building:update', (data) => {
-        if (data.building && data.lecture) {
-            app.buildingLectures[Number(data.building)] = data.lecture;
-        }
-    });
+    if (data.building && data.lecture) {
+        app.buildingLectures[data.building] = data.lecture; // keep "Building-01" as the key
+    }
+});
+
 
     // Board updates
     socket.on('board:update', (data) => {
