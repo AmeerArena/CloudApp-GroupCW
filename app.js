@@ -238,8 +238,8 @@ async function setLectureModule(id, title, module) {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     id: String(id),
-                    title: String(title || "").trim(),
-                    module: String(module || "").trim()
+                    title: String(title || ""),
+                    module: String(module || "")
                 })
             }
         );
@@ -247,7 +247,7 @@ async function setLectureModule(id, title, module) {
         const data = await response.json();
 
         if (!data.result) {
-            return { error: data.msg || "Failed to set module" };
+            return { error: data.msg || "Failed to set module/title" };
         }
 
         return data;
