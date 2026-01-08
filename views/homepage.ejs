@@ -1,5 +1,14 @@
 <div class="homepage-container">
-    <h2 class="text-center mb-4">Homepage</h2>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="text-center mb-0" style="flex: 1;">Homepage</h2>
+        <button 
+            class="btn btn-secondary"
+            @click="goToSettings"
+            style="margin-left: auto;"
+        >
+            Settings
+        </button>
+    </div>
     
     <!-- Building Grid -->
     <div class="building-grid mb-4">
@@ -25,6 +34,7 @@
         <button
             v-if="isLecturer && selectedBuilding"
             class="btn btn-primary btn-lg"
+            :disabled="isBuildingOccupied"
             @click="showStartLectureModal = true"
         >
             Start Lecture
@@ -43,6 +53,14 @@
     <!-- Info Message -->
     <div v-if="selectedBuilding && !isLecturer && !hasLectureInBuilding(selectedBuilding)" class="text-center mt-3">
         <p class="text-muted">No active lecture in Building {{ selectedBuilding }}</p>
+    </div>
+    
+    <!-- Lecturer: Building Occupied Message -->
+    <div v-if="selectedBuilding && isLecturer && isBuildingOccupied" class="text-center mt-3">
+        <p class="text-warning">
+            <strong>Building {{ selectedBuilding }} is already occupied by {{ buildingOccupiedBy }}.</strong><br>
+            Please select a different building to start your lecture.
+        </p>
     </div>
 
     <!-- Start Lecture Modal (Lecturers) -->

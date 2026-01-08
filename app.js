@@ -162,21 +162,17 @@ async function createLecture(title, module, lecturer, building) {
     }
 }
 
-async function updateUserModules(userId, modules, isLecturer) {
+async function updateUserModules(userName, modules, isLecturer) {
     try {
-        // Note: This endpoint may need to be created in the backend
-        // For now, we'll use a placeholder approach
-        // You may need to create an endpoint like /student/update or /lecturer/update
-        
         const endpoint = isLecturer 
-            ? `${BACKEND_ENDPOINT}/lecturer/update?code=${FUNCTION_KEY}`
-            : `${BACKEND_ENDPOINT}/student/update?code=${FUNCTION_KEY}`;
+            ? `${BACKEND_ENDPOINT}/lecturer/modules/replace?code=${FUNCTION_KEY}`
+            : `${BACKEND_ENDPOINT}/student/modules/replace?code=${FUNCTION_KEY}`;
 
         const response = await fetch(endpoint, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ 
-                id: userId,
+                name: userName,
                 modules: modules
             })
         });
@@ -191,8 +187,7 @@ async function updateUserModules(userId, modules, isLecturer) {
 
     } catch (err) {
         console.error("Update modules API ERROR:", err);
-        // Return true for the time being
-        return { result: true, modules: modules };
+        return { error: "API_ERROR" };
     }
 }
 
@@ -362,6 +357,12 @@ io.on('connection', socket => {
         const { title, module, lecturer, building } = data;
         const lectureId = String(building);
 
+        // Check if building already has an active lecture with a different lecturer
+        if (lectureData[lectureId] && lectureData[lectureId].lecturer && lectureData[lectureId].lecturer !== lecturer) {
+            socket.emit('lecture:start:error', `Building ${building} is already occupied by ${lectureData[lectureId].lecturer}. Please select a different building.`);
+            return;
+        }
+
         const r1 = await setLectureLecturer(lectureId, lecturer);
         if (r1.error) {
             socket.emit('lecture:start:error', r1.error);
@@ -385,7 +386,7 @@ io.on('connection', socket => {
             lecturer: lecturer || ''
             };
         } else {
-        // update metadata if lecture already existed
+        // update metadata if lecture already existed (same lecturer updating their own lecture)
         lectureData[lectureId].building = building || lectureData[lectureId].building;
         lectureData[lectureId].title = title || lectureData[lectureId].title;
         lectureData[lectureId].module = module || lectureData[lectureId].module;
@@ -532,8 +533,10 @@ io.on('connection', socket => {
     // Update Modules
     socket.on('modules:update', async (data) => {
         const { modules, userId, isLecturer } = data;
+        // API expects 'name', use socket.userName which was set during login, or fallback to userId
+        const userName = socket.userName;
 
-        const result = await updateUserModules(userId, modules, isLecturer);
+        const result = await updateUserModules(userName, modules, isLecturer);
 
         if (result.error) {
             socket.emit('modules:update:error', result.error);

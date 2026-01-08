@@ -83,6 +83,20 @@ var app = new Vue({
             } else {
                 return this.updatedModules.filter(Boolean).length === 4;
             }
+        },
+        isBuildingOccupied() {
+            if (!this.selectedBuilding || !this.isLecturer) {
+                return false;
+            }
+            const lecture = this.buildingLectures[this.selectedBuilding];
+            // Building is occupied if it has a lecture and the lecturer is different
+            return lecture && lecture.lecturer && lecture.lecturer !== this.me.name;
+        },
+        buildingOccupiedBy() {
+            if (!this.isBuildingOccupied) {
+                return null;
+            }
+            return this.buildingLectures[this.selectedBuilding].lecturer;
         }
     },
     mounted() {
@@ -186,6 +200,12 @@ var app = new Vue({
                 return;
             }
 
+            // Check if building is already occupied by another lecturer
+            if (this.isBuildingOccupied) {
+                this.quickLectureError = `Building ${this.selectedBuilding} is already occupied by ${this.buildingOccupiedBy}. Please select a different building.`;
+                return;
+            }
+
             if (!socket || !this.connected) {
                 this.quickLectureError = 'Not connected to server';
                 return;
@@ -262,6 +282,12 @@ var app = new Vue({
 
             if (!this.selectedBuilding) {
                 this.lectureError = 'Please select a building from the homepage';
+                return;
+            }
+
+            // Check if building is already occupied by another lecturer
+            if (this.isBuildingOccupied) {
+                this.lectureError = `Building ${this.selectedBuilding} is already occupied by ${this.buildingOccupiedBy}. Please select a different building.`;
                 return;
             }
 
@@ -382,7 +408,7 @@ var app = new Vue({
 
             socket.emit('modules:update', {
                 modules: modules,
-                userId: this.me.id || this.me.name,
+                userId: this.me.name || this.me.id, 
                 isLecturer: this.isLecturer
             });
         }
