@@ -331,6 +331,12 @@ io.on('connection', socket => {
         const { title, module, lecturer, building } = data;
         const lectureId = String(building);
 
+        // Check if building already has an active lecture with a different lecturer
+        if (lectureData[lectureId] && lectureData[lectureId].lecturer && lectureData[lectureId].lecturer !== lecturer) {
+            socket.emit('lecture:start:error', `Building ${building} is already occupied by ${lectureData[lectureId].lecturer}. Please select a different building.`);
+            return;
+        }
+
         const r1 = await setLectureLecturer(lectureId, lecturer);
         if (r1.error) {
             socket.emit('lecture:start:error', r1.error);
@@ -354,7 +360,7 @@ io.on('connection', socket => {
             lecturer: lecturer || ''
             };
         } else {
-        // update metadata if lecture already existed
+        // update metadata if lecture already existed (same lecturer updating their own lecture)
         lectureData[lectureId].building = building || lectureData[lectureId].building;
         lectureData[lectureId].title = title || lectureData[lectureId].title;
         lectureData[lectureId].module = module || lectureData[lectureId].module;

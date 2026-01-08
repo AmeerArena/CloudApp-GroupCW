@@ -34,6 +34,7 @@
         <button
             v-if="isLecturer && selectedBuilding"
             class="btn btn-primary btn-lg"
+            :disabled="isBuildingOccupied"
             @click="showStartLectureModal = true"
         >
             Start Lecture
@@ -52,6 +53,14 @@
     <!-- Info Message -->
     <div v-if="selectedBuilding && !isLecturer && !hasLectureInBuilding(selectedBuilding)" class="text-center mt-3">
         <p class="text-muted">No active lecture in Building {{ selectedBuilding }}</p>
+    </div>
+    
+    <!-- Lecturer: Building Occupied Message -->
+    <div v-if="selectedBuilding && isLecturer && isBuildingOccupied" class="text-center mt-3">
+        <p class="text-warning">
+            <strong>Building {{ selectedBuilding }} is already occupied by {{ buildingOccupiedBy }}.</strong><br>
+            Please select a different building to start your lecture.
+        </p>
     </div>
 
     <!-- Start Lecture Modal (Lecturers) -->
