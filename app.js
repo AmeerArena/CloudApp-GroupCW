@@ -253,6 +253,34 @@ async function setLectureModule(id, title, module) {
     }
 }
 
+async function endLecture(lectureId) {
+    if (!lectureId) return;
+
+    try {
+        // Clear DB
+        await fetch(`${BACKEND_ENDPOINT}/lecture/end?code=${FUNCTION_KEY}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: lectureId })
+        });
+    } catch (err) {
+        console.error("Lecture end API error:", err);
+    }
+
+    // Remove lecture 
+    delete lectureData[lectureId];
+    delete lectureParticipants[lectureId];
+
+    // Remove lecture from building grid
+    io.emit('lecture:building:update', {
+        building: Number(lectureId),
+        lecture: null
+    });
+
+    // Kick Students
+    io.emit('lecture:force-exit', lectureId);
+}
+
 // Store lecture data (board content and chat messages)
 const lectureData = {};
 
@@ -290,7 +318,6 @@ io.on('connection', socket => {
         
         // Successful login
         socket.emit('student:login:result', result);
-        console.log('Student logged in:', result);
     });
 
     // Student Register
@@ -334,7 +361,6 @@ io.on('connection', socket => {
         socket.userName = result.lecturer?.name || result.name || username;
         
         socket.emit('lecturer:login:result', result);
-        console.log('Lecturer logged in:', result);
     });
 
     // Lecturer Register
@@ -410,48 +436,59 @@ io.on('connection', socket => {
 
     // Join Lecture
     socket.on('lecture:join', (data) => {
-        const { lectureTitle, userType } = data;
+        const { lectureTitle } = data;
+
+        const lecture = lectureData[lectureTitle];
+        if (!lecture) {
+            socket.emit('lecture:join:error', 'Lecture does not exist');
+            return;
+        }
+
+        // MODULE CHECK FOR STUDENTS
+        if (socket.userType === 'student') {
+            const lectureModule = lecture.module;
+            const studentModules = socket.modules || [];
+
+            if (!studentModules.includes(lectureModule)) {
+                socket.emit(
+                    'lecture:join:error',
+                    'You are not enrolled in this module'
+                );
+                return;
+            }
+        }
+
+        // Passed checks → join lecture
         currentLecture = lectureTitle;
 
-        // Initialise if not exists
-        if (!lectureData[lectureTitle]) {
-            lectureData[lectureTitle] = {
-                boardContent: '',
-                chatMessages: []
-            };
-        }
-        
         if (!lectureParticipants[lectureTitle]) {
             lectureParticipants[lectureTitle] = {};
         }
 
         lectureParticipants[lectureTitle][socket.id] = {
-            userType: userType || "student",
-            userName: socket.userName || "Anonymous"
+            userType: socket.userType,
+            userName: socket.userName
         };
 
         const participants = Object.values(lectureParticipants[lectureTitle]);
         const studentCount = participants.filter(p => p.userType !== "lecturer").length;
 
-        // Notify all clients about updated participant list
         io.emit('lecture:count:update', {
             lectureTitle,
             studentCount
         });
 
-        // Send current board content and chat messages to the user
         socket.emit('board:update', {
-            content: lectureData[lectureTitle].boardContent,
-            lectureTitle: lectureTitle
+            content: lecture.boardContent,
+            lectureTitle
         });
 
-        // Send chat history
-        lectureData[lectureTitle].chatMessages.forEach(msg => {
+        lecture.chatMessages.forEach(msg => {
             socket.emit('chat:message', {
                 user: msg.user,
                 message: msg.message,
                 time: msg.time,
-                lectureTitle: lectureTitle
+                lectureTitle
             });
         });
     });
@@ -537,12 +574,9 @@ io.on('connection', socket => {
         });
     });
 
+    // end the lecture
     socket.on('lecture:end', async (lectureId) => {
-    // 1️Clear DB lecture
-    await fetch(`${BACKEND_ENDPOINT}/lecture/end?code=${FUNCTION_KEY}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: lectureId })
+        await endLecture(lectureId);
     });
 
     // 2 Remove lecture from memory
@@ -560,30 +594,38 @@ io.on('connection', socket => {
     });
 
 
-    socket.on('disconnect', () => {
+    socket.on('disconnect', async () => {
     console.log('Dropped connection');
     
     if (socket.sessionKey&& activeSessions.get(socket.sessionKey) === socket.id){
         activeSessions.delete(socket.sessionKey);
     }
 
-    if (currentLecture && lectureParticipants[currentLecture]) {
-        delete lectureParticipants[currentLecture][socket.id];
+        if (currentLecture && lectureParticipants[currentLecture]) {
+            const participant = lectureParticipants[currentLecture][socket.id];
 
-        const participants = Object.values(lectureParticipants[currentLecture]);
-        const studentCount = participants.filter(p => p.userType !== "lecturer").length;
+            // if lecturer, end the lecture
+            if (participant && participant.userType === 'lecturer') {
+                console.log(`Lecturer disconnected. Ending lecture ${currentLecture}`);
+                await endLecture(currentLecture);
+                return;
+            }
 
-        io.emit('lecture:count:update', {
-            lectureTitle: currentLecture,
-            studentCount
-        });
-    }
+            // Else just remove student
+            delete lectureParticipants[currentLecture][socket.id];
 
-    currentLecture = null;
+            const participants = Object.values(lectureParticipants[currentLecture]);
+            const studentCount = participants.filter(p => p.userType !== "lecturer").length;
+
+            io.emit('lecture:count:update', {
+                lectureTitle: currentLecture,
+                studentCount
+            });
+        }
+
+        currentLecture = null;
     });
-
 });
-
 
 // Start server
 const PORT = process.env.PORT || 8080;
