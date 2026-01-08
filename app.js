@@ -26,6 +26,7 @@ const BACKEND_ENDPOINT = process.env.BACKEND || 'https://groupcoursework-functio
 
 const FUNCTION_KEY = process.env.FUNCTION_KEY || 'hsuAcj6yIqFu2S-duKquK2DXhpg85E_BZjvxPqrC84HmAzFuo27TyQ==';
 
+const activeSessions = new Map();
 
 async function studentLogin(username, password) {
     try {
@@ -557,6 +558,10 @@ io.on('connection', socket => {
     // Dissconnect
     socket.on('disconnect', async () => {
         console.log('Dropped connection');
+
+        if (socket.sessionKey&& activeSessions.get(socket.sessionKey) === socket.id){
+            activeSessions.delete(socket.sessionKey);
+        }
 
         if (currentLecture && lectureParticipants[currentLecture]) {
             const participant = lectureParticipants[currentLecture][socket.id];
