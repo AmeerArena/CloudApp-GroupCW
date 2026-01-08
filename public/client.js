@@ -208,8 +208,14 @@ var app = new Vue({
         },
 
         hasLectureInBuilding(buildingNumber) {
-            const b = Number(buildingNumber);
-            return !!this.buildingLectures[b];
+            const lecture = this.buildingLectures[Number(buildingNumber)];
+            if (!lecture) return false;
+                
+            if (this.userType === 'student') {
+                return this.me.modules.includes(lecture.module);
+            }
+        
+            return true;
         },
 
         attendLecture() {
@@ -314,7 +320,7 @@ var app = new Vue({
 
         exitLecture() {
             if (this.isLecturer && this.currentLectureId) {
-            socket.emit('lecture:end', this.currentLectureId);
+                socket.emit('lecture:end', this.currentLectureId);
             }
 
             this.resetLectureState();
@@ -517,6 +523,11 @@ function connect() {
 
     socket.on('lecture:start:error', (msg) => {
         app.lectureError = msg;
+    });
+
+    socket.on('lecture:join:error', (msg) => {
+        alert(msg);
+        app.resetLectureState();
     });
 
     // Building lecture updates: receive broadcast when lectures start/end in buildings
