@@ -229,6 +229,33 @@ async function setLectureLecturer(id, lecturer) {
     }
 }
 
+async function setLectureModule(id, title, module) {
+    try {
+        const response = await fetch(
+            `${BACKEND_ENDPOINT}/lecture/setModule?code=${FUNCTION_KEY}`,
+            {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    id: String(id),
+                    title: String(title || "").trim(),
+                    module: String(module || "").trim()
+                })
+            }
+        );
+
+        const data = await response.json();
+
+        if (!data.result) {
+            return { error: data.msg || "Failed to set module" };
+        }
+
+        return data;
+    } catch (err) {
+        console.error("Set module API ERROR:", err);
+        return { error: "API_ERROR" };
+    }
+}
 
 // Store lecture data (board content and chat messages)
 const lectureData = {};
@@ -309,11 +336,17 @@ io.on('connection', socket => {
         const { title, module, lecturer, building } = data;
         const lectureId = String(building);
 
-        const result = await setLectureLecturer(lectureId, lecturer);
-        if (result.error) {
-            socket.emit('lecture:start:error', result.error);
+        const r1 = await setLectureLecturer(lectureId, lecturer);
+        if (r1.error) {
+            socket.emit('lecture:start:error', r1.error);
             return;
         }
+
+        const r2 = await setLectureModule(lectureId, title, module);
+        if (r2.error) {
+            socket.emit('lecture:start:error', r2.error);
+            return;
+    }
 
         // Initialise lecture data if not exists
         if (!lectureData[lectureId]) {
@@ -396,6 +429,27 @@ io.on('connection', socket => {
             });
         });
     });
+
+    socket.on('lecture:sync', () => {
+    const buildingLectures = {};
+
+    // lectureId is building number string (e.g. "1")
+    for (const [lectureId, info] of Object.entries(lectureData)) {
+        // only treat it as active if it has a lecturer + module + title (or at least lecturer)
+        if (info && info.lecturer) {
+            const b = Number(lectureId);
+            buildingLectures[b] = {
+                id: lectureId,
+                title: info.title || "",
+                module: info.module || "",
+                lecturer: info.lecturer || ""
+            };
+        }
+    }
+
+        socket.emit('lecture:sync:result', { buildingLectures });
+});
+
 
     // Board Updates
     socket.on('board:update', (data) => {

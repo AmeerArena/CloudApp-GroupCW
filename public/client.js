@@ -157,7 +157,7 @@ var app = new Vue({
 
         selectBuilding(buildingNumber) {
             // Select a building and close any open modals
-            this.selectedBuilding = buildingNumber;
+            this.selectedBuilding = Number(buildingNumber);
             this.showStartLectureModal = false;
         },
 
@@ -198,7 +198,7 @@ var app = new Vue({
                 title: this.quickLectureTitle,
                 module: this.quickSelectedModule,
                 lecturer: this.me.name,
-                building: this.selectedBuilding
+                building: Number(this.selectedBuilding)
             });
 
             // Close modal and clear form
@@ -208,8 +208,8 @@ var app = new Vue({
         },
 
         hasLectureInBuilding(buildingNumber) {
-            // Check if building has an active lecture
-            return this.buildingLectures[buildingNumber] !== undefined;
+            const b = Number(buildingNumber);
+            return !!this.buildingLectures[b];
         },
 
         attendLecture() {
@@ -269,7 +269,7 @@ var app = new Vue({
                 title: this.lectureTitle,
                 module: this.selectedModule,
                 lecturer: this.me.name,
-                building: this.selectedBuilding
+                building: Number(this.selectedBuilding)
             });
         },
 
@@ -414,6 +414,7 @@ function connect() {
             socket.userName = app.me.name;
         }
         updateUserDisplay();
+        socket.emit('lecture:sync');
     });
 
     // Login lecturer
@@ -432,6 +433,7 @@ function connect() {
             socket.userName = app.me.name;
         }
         updateUserDisplay();
+        socket.emit('lecture:sync');
     });
 
     // Register student
@@ -472,12 +474,13 @@ function connect() {
         } else {
             // Store lecture in building and join lecture room
             if (app.selectedBuilding) {
-                app.buildingLectures[app.selectedBuilding] = {
+                const b = Number(app.selectedBuilding);
+                app.buildingLectures[b] = {
                     title: app.currentLectureTitle,
                     module: app.selectedModule,
                     lecturer: app.me.name
                 };
-            }
+        }
 
             app.currentLectureModule = app.selectedModule || '';
             app.studentCount = 0;
@@ -499,15 +502,28 @@ function connect() {
         }
     });
 
+    socket.on('lecture:sync:result', (data) => {
+        if (data && data.buildingLectures) {
+            app.buildingLectures = data.buildingLectures;
+        }
+    });
+
     socket.on('lecture:start:error', (msg) => {
         app.lectureError = msg;
     });
 
     // Building lecture updates: receive broadcast when lectures start/end in buildings
     socket.on('lecture:building:update', (data) => {
-        if (data.building && data.lecture) {
-            app.buildingLectures[Number(data.building)] = data.lecture;
+        const b = Number(data.building);
+
+        // if lecture ended / cleared
+        if (!data.lecture) {
+            delete app.buildingLectures[b];
+            return;
         }
+
+        // lecture exists
+        app.buildingLectures[b] = data.lecture;
     });
 
     // Board updates
@@ -560,7 +576,7 @@ function connect() {
 
     // Chat messages
     socket.on('chat:message', (data) => {
-        if (data.lectureTitle === app.currentLectureTitle) {
+        if (data.lectureTitle === app.currentLectureId) {
             app.chatMessages.push({
                 user: data.user,
                 message: data.message,
@@ -593,7 +609,7 @@ function connect() {
     });
 
     socket.on('lecture:count:update', (data) => {
-    if (data.lectureTitle === app.currentLectureTitle) {
+    if (data.lectureTitle === app.currentLectureId) {
         app.studentCount = data.studentCount;
         }
     });
